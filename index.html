@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.10.0/dist/tabler-icons.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -31,7 +31,30 @@
 <div class="card"><div class="card-head"><span class="card-title">Витрати по днях</span></div><div id="daily-chart" class="daily-chart"></div></div>
 </div></section>
 <section id="page-operations" class="page"><div class="page-inner"><div class="page-head"><h2 class="page-title">Операції</h2><button class="btn-primary" id="add-btn-ops"><i class="ti ti-plus"></i> Додати</button></div><div class="filter-row"><button class="filter-pill active" data-filter="all">Всі</button><button class="filter-pill" data-filter="Дохід">Доходи</button><button class="filter-pill" data-filter="Витрата">Витрати</button><button class="filter-pill" data-filter="Сімейний">Сімейний</button><button class="filter-pill" data-filter="Євген">Євген</button><button class="filter-pill" data-filter="Марина">Марина</button></div><div id="ops-list" class="tx-list"></div></div></section>
-<section id="page-calendar" class="page"><div class="page-inner"><h2 class="page-title">Календар витрат</h2><div class="cal-nav"><button class="icon-btn-sm" id="cal-prev"><i class="ti ti-chevron-left"></i></button><span class="cal-month-label" id="cal-month-label">Травень 2026</span><button class="icon-btn-sm" id="cal-next"><i class="ti ti-chevron-right"></i></button></div><div id="cal-grid" class="cal-grid"></div><div class="card" id="cal-day-detail" style="display:none"><div class="card-head"><span class="card-title" id="cal-day-title">—</span></div><div id="cal-day-list" class="tx-list"></div></div></div></section>
+<section id="page-calendar" class="page"><div class="page-inner">
+  <h2 class="page-title">Календар витрат</h2>
+  <div class="cal-period-row">
+    <button class="cal-period-btn active" data-period="month">Місяць</button>
+    <button class="cal-period-btn" data-period="3m">3 місяці</button>
+    <button class="cal-period-btn" data-period="6m">6 місяців</button>
+    <button class="cal-period-btn" data-period="year">Рік</button>
+  </div>
+  <div class="cal-kpi-row">
+    <div class="cal-kpi inc"><div class="cal-kpi-label">Доходи</div><div class="cal-kpi-val" id="cal-income">—</div></div>
+    <div class="cal-kpi exp"><div class="cal-kpi-label">Витрати</div><div class="cal-kpi-val" id="cal-expense">—</div></div>
+    <div class="cal-kpi bal"><div class="cal-kpi-label">Баланс</div><div class="cal-kpi-val" id="cal-balance">—</div></div>
+  </div>
+  <div class="cal-nav">
+    <button class="icon-btn-sm" id="cal-prev"><i class="ti ti-chevron-left"></i></button>
+    <span class="cal-month-label" id="cal-month-label">Травень 2026</span>
+    <button class="icon-btn-sm" id="cal-next"><i class="ti ti-chevron-right"></i></button>
+  </div>
+  <div id="cal-grid" class="cal-grid"></div>
+  <div class="card" id="cal-day-detail" style="display:none">
+    <div class="card-head"><span class="card-title" id="cal-day-title">—</span></div>
+    <div id="cal-day-list" class="tx-list"></div>
+  </div>
+</div></section>
 <section id="page-analytics" class="page"><div class="page-inner"><h2 class="page-title">Аналіз</h2><div class="analytics-grid"><div class="card"><div class="card-head"><span class="card-title">По категоріях</span></div><div id="analytics-cats" class="cat-bars"></div></div><div class="card"><div class="card-head"><span class="card-title">По бюджетах</span></div><div id="analytics-budgets"></div></div></div></div></section>
 <section id="page-reserve" class="page"><div class="page-inner"><div class="page-head"><h2 class="page-title">Резерв</h2><button class="btn-primary btn-green" id="add-reserve-btn"><i class="ti ti-plus"></i> Поповнити</button></div><div class="kpi-grid"><div class="kpi-card kpi-income"><div class="kpi-icon"><i class="ti ti-shield"></i></div><div class="kpi-label">Загальний резерв</div><div class="kpi-value" id="res-total">—</div><div class="kpi-delta">UAH еквівалент</div></div><div class="kpi-card kpi-balance"><div class="kpi-icon"><i class="ti ti-calendar-stats"></i></div><div class="kpi-label">Місяців покриття</div><div class="kpi-value" id="res-months">—</div><div class="kpi-delta" id="res-months-label"></div></div><div class="kpi-card kpi-purple"><div class="kpi-icon"><i class="ti ti-trending-up"></i></div><div class="kpi-label">Поповнено у місяці</div><div class="kpi-value" id="res-added">—</div></div></div><div class="card"><div class="card-head"><span class="card-title">Покриття витрат</span><span class="mm-val-label" id="mm-val">0 міс.</span></div><div class="mm-track"><div class="mm-fill" id="mm-fill" style="width:0%"></div></div><div class="mm-zones"><div class="mm-zone zone-red"><strong>0–2</strong><br>Небезпечно</div><div class="mm-zone zone-amber"><strong>2–4</strong><br>Мінімум</div><div class="mm-zone zone-green"><strong>4–6+</strong><br>Комфортно</div></div></div><div class="dash-grid"><div class="card"><div class="card-head"><span class="card-title">По валютах</span></div><div id="res-currencies"></div></div><div class="card"><div class="card-head"><span class="card-title">Динаміка</span></div><div id="res-history" class="res-history"></div></div></div><div class="card"><div class="card-head"><span class="card-title">Операції</span></div><div id="res-tx-list" class="tx-list"></div></div></div></section>
 <section id="page-goals" class="page"><div class="page-inner"><div class="page-head"><h2 class="page-title">Цілі</h2><button class="btn-primary" id="add-goal-btn"><i class="ti ti-plus"></i> Нова ціль</button></div><div id="goals-list" class="goals-grid"></div></div></section>
@@ -42,8 +65,25 @@
 <div class="settings-section"><div class="settings-label">Назва родини</div><div class="settings-card"><div class="settings-row-item"><div class="sri-icon"><i class="ti ti-home-heart"></i></div><input class="settings-name-input flex1" id="family-name-input" value="Родина Коваль" placeholder="Назва родини"><button class="btn-ghost-sm" id="save-family-btn">Зберегти</button></div></div></div>
 <div class="settings-section"><div class="settings-label">Google Sheets</div><div class="settings-card"><div class="settings-row-item"><div class="sri-icon green"><i class="ti ti-brand-google"></i></div><div class="sri-info"><div class="sri-name">Синхронізація</div><div class="sri-sub" id="sync-status">Перевірка...</div></div><button class="btn-ghost-sm" id="sync-now-btn">Sync</button></div><div class="settings-row-item"><div class="sri-icon"><i class="ti ti-link"></i></div><div class="sri-info"><div class="sri-name">URL скрипта</div><div class="sri-sub url-preview" id="script-url-preview">Не налаштовано</div></div><button class="btn-ghost-sm" id="set-url-btn">Змінити</button></div></div></div>
 <div class="settings-section"><div class="settings-label">Monobank</div><div class="settings-card"><div class="settings-row-item"><div class="sri-icon" style="background:#1a1a2e;color:#fff"><i class="ti ti-credit-card"></i></div><div class="sri-info"><div class="sri-name">Токен Євген</div><input class="settings-token-input" id="mono-token-evgen" placeholder="uXXXXXXXXXXXXX" type="password"></div><button class="btn-ghost-sm" id="save-mono-evgen">Зберегти</button></div><div class="settings-row-item"><div class="sri-icon" style="background:#1a1a2e;color:#fff"><i class="ti ti-credit-card"></i></div><div class="sri-info"><div class="sri-name">Токен Марина</div><input class="settings-token-input" id="mono-token-marina" placeholder="uXXXXXXXXXXXXX" type="password"></div><button class="btn-ghost-sm" id="save-mono-marina">Зберегти</button></div><div class="settings-row-item"><div class="sri-icon"><i class="ti ti-download"></i></div><div class="sri-info"><div class="sri-name">Імпорт виписки</div><div class="sri-sub">Завантажити операції за 7 днів</div></div><button class="btn-ghost-sm" id="import-mono-btn">Імпорт</button></div></div></div>
-<div class="settings-section"><div class="settings-label">Категорії витрат</div><div class="settings-card"><div class="cat-accordion" id="expense-cats-list"></div><div class="settings-row-item"><input class="settings-name-input flex1" id="new-expense-cat" placeholder="Нова категорія..."><button class="btn-ghost-sm" id="add-expense-cat"><i class="ti ti-plus"></i></button></div></div></div>
-<div class="settings-section"><div class="settings-label">Категорії доходів</div><div class="settings-card"><div class="cat-accordion" id="income-cats-list"></div><div class="settings-row-item"><input class="settings-name-input flex1" id="new-income-cat" placeholder="Нова категорія..."><button class="btn-ghost-sm" id="add-income-cat"><i class="ti ti-plus"></i></button></div></div></div>
+<div class="settings-section">
+  <div class="settings-label">Категорії</div>
+  <div class="cat-tabs">
+    <button class="cat-tab active" data-tab="expense"><i class="ti ti-arrow-up-circle"></i> Витрати</button>
+    <button class="cat-tab" data-tab="income"><i class="ti ti-arrow-down-circle"></i> Доходи</button>
+  </div>
+  <div class="cat-panel active" id="panel-expense">
+    <div class="settings-card">
+      <div class="cat-accordion" id="expense-cats-list"></div>
+      <div class="settings-row-item"><input class="settings-name-input flex1" id="new-expense-cat" placeholder="+ Нова категорія витрат"><button class="btn-ghost-sm" id="add-expense-cat"><i class="ti ti-plus"></i></button></div>
+    </div>
+  </div>
+  <div class="cat-panel" id="panel-income">
+    <div class="settings-card">
+      <div class="cat-accordion" id="income-cats-list"></div>
+      <div class="settings-row-item"><input class="settings-name-input flex1" id="new-income-cat" placeholder="+ Нова категорія доходів"><button class="btn-ghost-sm" id="add-income-cat"><i class="ti ti-plus"></i></button></div>
+    </div>
+  </div>
+</div>
 </div></section>
 </main>
 <nav id="bottom-nav"><a class="bn-item active" data-page="dashboard"><i class="ti ti-home"></i><span>Головна</span></a><a class="bn-item" data-page="operations"><i class="ti ti-list"></i><span>Операції</span></a><a class="bn-item" data-page="calendar"><i class="ti ti-calendar"></i><span>Календар</span></a><a class="bn-item" data-page="reserve"><i class="ti ti-shield"></i><span>Резерв</span></a><a class="bn-item" data-page="settings"><i class="ti ti-settings"></i><span>Налашт.</span></a></nav>
