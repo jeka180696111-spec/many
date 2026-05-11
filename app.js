@@ -15,32 +15,51 @@ function loadSettings(){
 }
 
 function initGoogleAuth(){
-  const s=document.createElement('script');
-  s.src='https://accounts.google.com/gsi/client';
-  s.onload=()=>{
-    const u=localStorage.getItem(APP_CONFIG.USER_KEY);
-    const t=localStorage.getItem(APP_CONFIG.TOKEN_KEY);
-    if(u&&t){state.user=JSON.parse(u);state.token=t;showApp();}
-    else showAuthScreen();
-  };
-  s.onerror=()=>{
-    const u=localStorage.getItem(APP_CONFIG.USER_KEY);
-    if(u){state.user=JSON.parse(u);state.token=localStorage.getItem(APP_CONFIG.TOKEN_KEY);showApp();}
-    else showAuthScreen();
-  };
-  document.head.appendChild(s);
+  // Check redirect callback first (hash contains access_token)
+  if(location.hash.includes('access_token')){
+    handleOAuthRedirect();
+    return;
+  }
+  // Check saved session
+  const u=localStorage.getItem(APP_CONFIG.USER_KEY);
+  const t=localStorage.getItem(APP_CONFIG.TOKEN_KEY);
+  if(u&&t){state.user=JSON.parse(u);state.token=t;showApp();return;}
+  showAuthScreen();
 }
 
 document.getElementById('google-signin-btn').addEventListener('click',()=>{
-  if(!window.google){alert('Немає інтернету. Перевірте підключення.');return;}
-  google.accounts.id.initialize({client_id:APP_CONFIG.GOOGLE_CLIENT_ID,callback:handleGoogleSignIn});
-  google.accounts.id.prompt(n=>{
-    if(n.isNotDisplayed()||n.isSkippedMoment()){
-      const url='https://accounts.google.com/o/oauth2/v2/auth?client_id='+APP_CONFIG.GOOGLE_CLIENT_ID+'&redirect_uri='+encodeURIComponent(location.origin+location.pathname)+'&response_type=token&scope=email%20profile';
-      location.href=url;
-    }
+  // Use redirect flow - most reliable across all browsers
+  const params=new URLSearchParams({
+    client_id: APP_CONFIG.GOOGLE_CLIENT_ID,
+    redirect_uri: location.origin+location.pathname,
+    response_type: 'token',
+    scope: 'email profile openid',
+    prompt: 'select_account',
   });
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
 });
+
+function handleOAuthRedirect(){
+  const hash=location.hash.substring(1);
+  const params=new URLSearchParams(hash);
+  const token=params.get('access_token');
+  if(!token){showAuthScreen();return;}
+  // Clean URL
+  history.replaceState(null,'',location.pathname);
+  // Fetch user info with access token
+  fetch('https://www.googleapis.com/oauth2/v2/userinfo',{
+    headers:{Authorization:'Bearer '+token}
+  })
+  .then(r=>r.json())
+  .then(info=>{
+    state.user={name:info.given_name||info.name,email:info.email};
+    state.token=token;
+    localStorage.setItem(APP_CONFIG.USER_KEY,JSON.stringify(state.user));
+    localStorage.setItem(APP_CONFIG.TOKEN_KEY,token);
+    showApp();
+  })
+  .catch(()=>showAuthScreen());
+}
 
 function handleGoogleSignIn(resp){
   const tok=resp.credential;
