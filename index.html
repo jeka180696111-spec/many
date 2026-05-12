@@ -26,11 +26,11 @@
 <section id="page-dashboard" class="page active"><div class="page-inner">
 <div class="greeting-row"><div><div class="greeting" id="greeting-text">Привіт!</div><div class="greeting-sub" id="greeting-month">Травень 2026</div></div><button class="add-fab-inline" id="add-btn-dash"><i class="ti ti-plus"></i><span>Додати</span></button></div>
 <div class="kpi-grid"><div class="kpi-card kpi-income"><div class="kpi-icon"><i class="ti ti-arrow-down-circle"></i></div><div class="kpi-label">Доходи</div><div class="kpi-value" id="dash-income">—</div><div class="kpi-delta" id="dash-income-delta"></div></div><div class="kpi-card kpi-expense"><div class="kpi-icon"><i class="ti ti-arrow-up-circle"></i></div><div class="kpi-label">Витрати</div><div class="kpi-value" id="dash-expense">—</div></div><div class="kpi-card kpi-balance"><div class="kpi-icon"><i class="ti ti-wallet"></i></div><div class="kpi-label">Залишок</div><div class="kpi-value" id="dash-balance">—</div><div class="kpi-delta" id="dash-savings-rate"></div></div></div>
-<div class="accounts-row" id="accounts-row"></div>
+<div class="members-columns" id="members-columns"></div>
 <div class="dash-grid"><div class="card"><div class="card-head"><span class="card-title">Останні операції</span><span class="card-link" data-page="operations">Всі →</span></div><div id="recent-list" class="tx-list"></div></div><div class="card"><div class="card-head"><span class="card-title">По категоріях</span></div><div id="cat-bars" class="cat-bars"></div></div></div>
 <div class="card"><div class="card-head"><span class="card-title">Витрати по днях</span></div><div id="daily-chart" class="daily-chart"></div></div>
 </div></section>
-<section id="page-operations" class="page"><div class="page-inner"><div class="page-head"><h2 class="page-title">Операції</h2><button class="btn-primary" id="add-btn-ops"><i class="ti ti-plus"></i> Додати</button></div><div class="filter-row"><button class="filter-pill active" data-filter="all">Всі</button><button class="filter-pill" data-filter="Дохід">Доходи</button><button class="filter-pill" data-filter="Витрата">Витрати</button><button class="filter-pill" data-filter="Сімейний">Сімейний</button><button class="filter-pill" data-filter="Євген">Євген</button><button class="filter-pill" data-filter="Марина">Марина</button></div><div id="ops-list" class="tx-list"></div></div></section>
+<section id="page-operations" class="page"><div class="page-inner"><div class="page-head"><h2 class="page-title">Операції</h2><button class="btn-primary" id="add-btn-ops"><i class="ti ti-plus"></i> Додати</button></div><div class="filter-row"><button class="filter-pill active" data-filter="all">Всі</button><button class="filter-pill" data-filter="Дохід">Доходи</button><button class="filter-pill" data-filter="Витрата">Витрати</button><button class="filter-pill" data-filter="Євген">Євген</button><button class="filter-pill" data-filter="Марина">Марина</button></div><div id="ops-list" class="tx-list"></div></div></section>
 <section id="page-calendar" class="page"><div class="page-inner">
   <h2 class="page-title">Календар витрат</h2>
   <div class="cal-period-row">
@@ -86,17 +86,41 @@
 </div>
 <div class="settings-section">
   <div class="settings-label">Картки та рахунки</div>
-  <div class="settings-card">
-    <div class="cat-accordion" id="cards-list"></div>
-    <div class="settings-row-item"><input class="settings-name-input flex1" id="new-card" placeholder="Назва картки / рахунку"><button class="btn-ghost-sm" id="add-card"><i class="ti ti-plus"></i> Обрати іконку</button></div>
+  <div class="members-cards-tabs">
+    <button class="mc-tab active" data-mctab="evgen">👤 Євген</button>
+    <button class="mc-tab" data-mctab="marina">👤 Марина</button>
   </div>
+  <div class="mc-panel active" id="mc-panel-evgen">
+    <div class="settings-card">
+      <div class="cat-accordion" id="cards-evgen-list"></div>
+      <div class="settings-row-item"><input class="settings-name-input flex1" id="new-card-євген" placeholder="Назва картки Євген"><button class="btn-ghost-sm" id="add-card-evgen"><i class="ti ti-plus"></i> Обрати іконку</button></div>
+    </div>
+  </div>
+  <div class="mc-panel" id="mc-panel-marina">
+    <div class="settings-card">
+      <div class="cat-accordion" id="cards-marina-list"></div>
+      <div class="settings-row-item"><input class="settings-name-input flex1" id="new-card-марина" placeholder="Назва картки Марина"><button class="btn-ghost-sm" id="add-card-marina"><i class="ti ti-plus"></i> Обрати іконку</button></div>
+    </div>
+  </div>
+  <div style="margin-top:10px;text-align:right;"><span id="last-sync-time" style="font-size:11px;color:var(--c-text-3)"></span></div>
 </div>
 </div></section>
 </main>
 <nav id="bottom-nav"><a class="bn-item active" data-page="dashboard"><i class="ti ti-home"></i><span>Головна</span></a><a class="bn-item" data-page="operations"><i class="ti ti-list"></i><span>Операції</span></a><a class="bn-item" data-page="calendar"><i class="ti ti-calendar"></i><span>Календар</span></a><a class="bn-item" data-page="reserve"><i class="ti ti-shield"></i><span>Резерв</span></a><a class="bn-item" data-page="settings"><i class="ti ti-settings"></i><span>Налашт.</span></a></nav>
 </div></div>
 <div id="modal-overlay" class="hidden"></div>
-<div id="modal-add" class="modal hidden"><div class="modal-handle"></div><div class="modal-head"><div class="modal-title">Нова операція</div><div class="type-toggle"><button class="tt-btn active tt-expense" id="tt-expense">Витрата</button><button class="tt-btn tt-income" id="tt-income">Дохід</button></div></div><div class="amount-wrap"><span class="amount-cur-sym" id="amount-cur-icon">₴</span><input type="number" id="amount-input" class="amount-input" placeholder="0" inputmode="decimal"><button class="currency-badge" id="currency-btn">UAH <i class="ti ti-chevron-down"></i></button></div><div class="cat-grid" id="cat-grid-modal"></div><div class="modal-row"><label class="modal-label">Рахунок / картка</label><div class="cat-grid" id="card-grid-modal"></div></div><input type="text" id="desc-input" class="desc-input" placeholder="Коментар"><div class="modal-row"><label class="modal-label">Дата та час</label><input type="datetime-local" id="datetime-input" class="desc-input" style="margin-bottom:0"></div><div class="modal-footer"><button class="save-btn" id="save-btn">Зберегти витрату</button></div></div>
+<div id="modal-add" class="modal hidden"><div class="modal-handle"></div><div class="modal-head"><div class="modal-title">Нова операція</div><div class="type-toggle"><button class="tt-btn active tt-expense" id="tt-expense">Витрата</button><button class="tt-btn tt-income" id="tt-income">Дохід</button></div></div><div class="amount-wrap"><span class="amount-cur-sym" id="amount-cur-icon">₴</span><input type="number" id="amount-input" class="amount-input" placeholder="0" inputmode="decimal"><button class="currency-badge" id="currency-btn">UAH <i class="ti ti-chevron-down"></i></button></div><div class="cat-grid" id="cat-grid-modal"></div>
+<div class="modal-row">
+  <label class="modal-label">Чий рахунок</label>
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <button class="owner-modal-btn active" data-owner="Євген" id="modal-owner-evgen" style="flex:1;padding:8px;border-radius:10px;font-size:13px;font-weight:700;background:var(--c-blue-soft);color:var(--c-blue);border:2px solid var(--c-blue);">Євген</button>
+    <button class="owner-modal-btn" data-owner="Марина" id="modal-owner-marina" style="flex:1;padding:8px;border-radius:10px;font-size:13px;font-weight:700;background:var(--c-bg-3);color:var(--c-text-2);border:2px solid transparent;">Марина</button>
+  </div>
+  <select id="modal-owner-select" style="display:none"></select>
+  <label class="modal-label">Рахунок</label>
+  <div class="cat-grid" id="card-grid-modal"></div>
+</div>
+<input type="text" id="desc-input" class="desc-input" placeholder="Коментар"><div class="modal-row"><label class="modal-label">Дата та час</label><input type="datetime-local" id="datetime-input" class="desc-input" style="margin-bottom:0"></div><div class="modal-footer"><button class="save-btn" id="save-btn">Зберегти витрату</button></div></div>
 <div id="modal-reserve" class="modal hidden"><div class="modal-handle"></div><div class="modal-head"><div class="modal-title">Резерв</div><div class="type-toggle"><button class="tt-btn active tt-income" id="rt-add">Поповнення</button><button class="tt-btn tt-expense" id="rt-remove">Зняття</button></div></div><div class="amount-wrap"><span class="amount-cur-sym">₴</span><input type="number" id="res-amount-input" class="amount-input" placeholder="0" inputmode="decimal"><button class="currency-badge" id="res-currency-btn">UAH <i class="ti ti-chevron-down"></i></button></div><input type="text" id="res-desc-input" class="desc-input" placeholder="Коментар"><div class="modal-footer"><button class="save-btn save-green" id="res-save-btn">Зберегти поповнення</button></div></div>
 <div id="modal-goal" class="modal hidden"><div class="modal-handle"></div><div class="modal-head"><div class="modal-title" id="goal-modal-title">Нова ціль</div></div><input type="text" id="goal-name-input" class="desc-input" placeholder="Назва цілі"><div class="amount-wrap"><span class="amount-cur-sym">₴</span><input type="number" id="goal-target-input" class="amount-input" placeholder="Сума цілі" inputmode="decimal"></div><input type="number" id="goal-saved-input" class="desc-input" placeholder="Вже накопичено (0)"><input type="text" id="goal-budget-input" class="desc-input" placeholder="Бюджет (Сімейний)"><div class="modal-footer"><button class="save-btn" id="goal-save-btn">Зберегти ціль</button></div></div>
 <div id="modal-transfer" class="modal hidden"><div class="modal-handle"></div><div class="modal-head"><div class="modal-title">Переказ між цілями</div></div><div class="settings-card" style="margin-bottom:14px"><div class="settings-row-item"><div class="sri-info"><div class="sri-name">З цілі</div><select class="settings-select" id="transfer-from"></select></div></div><div class="settings-row-item"><div class="sri-info"><div class="sri-name">До цілі</div><select class="settings-select" id="transfer-to"></select></div></div></div><div class="amount-wrap"><span class="amount-cur-sym">₴</span><input type="number" id="transfer-amount" class="amount-input" placeholder="Сума" inputmode="decimal"></div><div class="modal-footer"><button class="save-btn" id="transfer-save-btn">Перекласти</button></div></div>
