@@ -1,7 +1,7 @@
 'use strict';
-const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',SCALE_KEY:'budget_scale',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina'};
-const ICON_LIST=['ti-shopping-cart','ti-car','ti-home','ti-tools-kitchen-2','ti-heart','ti-shirt','ti-device-gamepad-2','ti-sofa','ti-baby-carriage','ti-dots','ti-briefcase','ti-coin','ti-plane','ti-book','ti-coffee','ti-paw','ti-phone','ti-gift','ti-bike','ti-pill','ti-school','ti-sport-billard','ti-music','ti-bus','ti-credit-card','ti-cash','ti-building-bank','ti-star','ti-pizza','ti-salad','ti-droplet','ti-bolt','ti-wifi','ti-device-laptop','ti-tools','ti-shirt-sport','ti-garden-cart','ti-paw','ti-vaccine','ti-receipt'];
-const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',dashboard:null,reserve:null,operations:[],goals:[],fx:null,filterActive:'all',editingGoalIdx:-1};
+const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina'};
+const ICON_LIST=['ti-shopping-cart','ti-car','ti-home','ti-tools-kitchen-2','ti-heart','ti-shirt','ti-device-gamepad-2','ti-sofa','ti-baby-carriage','ti-dots','ti-briefcase','ti-coin','ti-plane','ti-book','ti-coffee','ti-paw','ti-phone','ti-gift','ti-bike','ti-pill','ti-school','ti-sport-billard','ti-music','ti-bus','ti-credit-card','ti-cash','ti-building-bank','ti-star','ti-pizza','ti-salad','ti-droplet','ti-bolt','ti-wifi','ti-device-laptop','ti-tools','ti-shirt-sport','ti-garden-cart','ti-vaccine','ti-receipt'];
+const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',dashboard:null,reserve:null,operations:[],goals:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null};
 const CURRENCIES=['UAH','USD','EUR'],CUR_SYMBOLS={UAH:'₴',USD:'$',EUR:'€'};
 const MONTH_UK=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const DEFAULT_EXP_CATS=[{id:'Продукти',icon:'ti-shopping-cart',bg:'#E1F5EE',color:'#085041'},{id:'Транспорт',icon:'ti-car',bg:'#FAECE7',color:'#712B13'},{id:'Комунальні',icon:'ti-home',bg:'#E6F1FB',color:'#0C447C'},{id:'Ресторани',icon:'ti-tools-kitchen-2',bg:'#FEF3E2',color:'#633806'},{id:"Здоров'я",icon:'ti-heart',bg:'#FBEAF0',color:'#72243E'},{id:'Одяг',icon:'ti-shirt',bg:'#EEEDFE',color:'#3C3489'},{id:'Розваги',icon:'ti-device-gamepad-2',bg:'#F0F4FF',color:'#2D4AB7'},{id:'Дім',icon:'ti-sofa',bg:'#E6F1FB',color:'#0C447C'},{id:'Дитячі',icon:'ti-baby-carriage',bg:'#FBEAF0',color:'#72243E'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
@@ -12,6 +12,27 @@ function getExpCats(){try{const s=localStorage.getItem(APP_CONFIG.EXP_CATS_KEY);
 function getIncCats(){try{const s=localStorage.getItem(APP_CONFIG.INC_CATS_KEY);return s?JSON.parse(s):DEFAULT_INC_CATS;}catch{return DEFAULT_INC_CATS;}}
 function getCards(){try{const s=localStorage.getItem(APP_CONFIG.CARDS_KEY);return s?JSON.parse(s):DEFAULT_CARDS;}catch{return DEFAULT_CARDS;}}
 function saveCards(c){localStorage.setItem(APP_CONFIG.CARDS_KEY,JSON.stringify(c));syncSettingsToSheet();}
+
+// ── ACCOUNTS BALANCE ─────────────────────────────────────────────
+// Рахує баланс кожного рахунку з state.operations
+function getAccountBalances(){
+  const cards=getCards();
+  const balances={};
+  cards.forEach(c=>{ balances[c.id]=0; });
+  state.operations.forEach(op=>{
+    const card=op.card||'';
+    if(!card)return;
+    if(!(card in balances))balances[card]=0;
+    if(op.type==='Дохід') balances[card]+=(op.amountUah||op.amount||0);
+    else if(op.type==='Витрата') balances[card]-=(op.amountUah||op.amount||0);
+  });
+  return balances;
+}
+// Загальний баланс по всіх рахунках
+function getTotalBalance(){
+  const b=getAccountBalances();
+  return Object.values(b).reduce((s,v)=>s+v,0);
+}
 function getCat(id){return [...getExpCats(),...getIncCats()].find(c=>c.id===id)||{id,icon:'ti-dots',bg:'#F0F0F0',color:'#555'};}
 function getGoals(){try{const s=localStorage.getItem(APP_CONFIG.GOALS_KEY);return s?JSON.parse(s):[];}catch{return[];}}
 function saveGoals(g){localStorage.setItem(APP_CONFIG.GOALS_KEY,JSON.stringify(g));}
@@ -27,10 +48,9 @@ window.addEventListener('DOMContentLoaded',()=>{loadSettings();initGoogleAuth();
 
 function loadSettings(){
   const theme=localStorage.getItem(APP_CONFIG.THEME_KEY)||'light';
-  const scale=localStorage.getItem(APP_CONFIG.SCALE_KEY)||'1.0';
   const font=localStorage.getItem(APP_CONFIG.FONT_KEY)||'Manrope';
   state.scriptUrl=localStorage.getItem(APP_CONFIG.SCRIPT_URL_KEY)||'';
-  applyTheme(theme);applyScale(scale);applyFont(font);
+  applyTheme(theme);applyFont(font);
   // Load family name
   const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
   const fi=document.getElementById('family-name-input');
@@ -161,22 +181,67 @@ function renderDashboard(d){
   setText('dash-expense',fmtMoney(d.totalExpense,'UAH'));
   setText('dash-balance',fmtMoney(d.balance,'UAH'));
   setText('dash-savings-rate','Накопичення '+(d.savingsRate||0).toFixed(0)+'%');
-  setText('bud-family',fmtMoney(d.budgets?.["Сімейний"]?.balance,"UAH"));
-  setText('bud-evgen',fmtMoney(d.budgets?.["Євген"]?.balance,"UAH"));
-  setText('bud-marina',fmtMoney(d.budgets?.["Марина"]?.balance,"UAH"));
+  renderAccountChips();
   renderRecentOps(d.recent||[]);
   renderCatBars("cat-bars",d.byCategory||{},d.totalExpense);
   renderDailyChart(d.byDay||{});
   updateMonthLabel();
+}
+function renderAccountChips(){
+  const el=document.getElementById('accounts-row');if(!el)return;
+  const cards=getCards();
+  const balances=getAccountBalances();
+  el.innerHTML=cards.map(c=>{
+    const bal=balances[c.id]||0;
+    const isActive=state.activeAccountId===c.id;
+    return `<div class="account-chip${isActive?' active':''}" data-account="${esc(c.id)}">
+      <div class="account-chip-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
+      <div class="account-chip-info">
+        <div class="account-chip-name">${esc(c.id)}</div>
+        <div class="account-chip-bal ${bal>=0?'pos':'neg'}">${fmtMoney(Math.abs(bal),'UAH')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.account-chip').forEach(ch=>{
+    ch.addEventListener('click',()=>openAccountDetail(ch.dataset.account));
+  });
+}
+function openAccountDetail(accountId){
+  const card=getCards().find(c=>c.id===accountId);
+  if(!card)return;
+  const ops=state.operations.filter(o=>o.card===accountId);
+  const bal=getAccountBalances()[accountId]||0;
+  let old=document.getElementById('account-detail-modal');if(old)old.remove();
+  const div=document.createElement('div');
+  div.id='account-detail-modal';
+  div.style.cssText='position:fixed;inset:0;z-index:500;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);';
+  const txHtml=ops.length?ops.slice(0,15).map(txItem).join(''):'<div style="padding:20px;text-align:center;color:var(--c-text-3)">Операцій немає</div>';
+  div.innerHTML=`<div style="background:var(--c-card);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;">
+    <div style="width:40px;height:4px;background:var(--c-border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+      <div style="width:48px;height:48px;border-radius:14px;background:${card.bg};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;"><i class="ti ${card.icon}" style="color:${card.color}"></i></div>
+      <div style="flex:1"><div style="font-size:18px;font-weight:700;">${esc(card.id)}</div><div style="font-size:13px;color:var(--c-text-2)">Рахунок</div></div>
+      <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:${bal>=0?'var(--c-green)':'var(--c-red)'};">${fmtMoney(bal,'UAH')}</div><div style="font-size:11px;color:var(--c-text-3)">Поточний баланс</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);margin-bottom:10px;">Операції</div>
+    <div class="tx-list">${txHtml}</div>
+    <button id="acc-close-btn" style="width:100%;margin-top:16px;padding:13px;border-radius:14px;background:var(--c-bg-3);color:var(--c-text-2);font-size:14px;font-weight:700;">Закрити</button>
+  </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click',e=>{if(e.target===div)div.remove();});
+  div.querySelector('#acc-close-btn').addEventListener('click',()=>div.remove());
 }
 function renderRecentOps(ops){
   const el=document.getElementById('recent-list');
   if(!ops.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--c-text-3);font-size:13px">Операцій немає</div>';return;}
   el.innerHTML=ops.slice(0,6).map(txItem).join('');
 }
-function txItem(op){
+function txItem(op,editable=false){
   const cat=getCat(op.category);const plus=op.type==="Дохід";
-  return '<div class="tx-item"><div class="tx-icon" style="background:'+cat.bg+'"><i class="ti '+cat.icon+'" style="color:'+cat.color+'"></i></div><div class="tx-info"><div class="tx-name">'+esc(op.desc||op.category)+'</div><div class="tx-meta">'+esc(op.category)+' · '+esc(op.who||'')+' · '+fmtDate(op.date)+'</div></div><div class="tx-amount '+(plus?'plus':'minus')+'">'+(plus?'+':'−')+fmtMoney(op.amount,op.currency)+'</div></div>';
+  const cards=getCards();const cardObj=cards.find(c=>c.id===op.card);
+  const cardBadge=cardObj?`<span style="display:inline-flex;align-items:center;gap:3px;background:${cardObj.bg};color:${cardObj.color};border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;"><i class="ti ${cardObj.icon}"></i>${esc(cardObj.id)}</span>`:'';
+  const editBtn=editable?`<button class="tx-edit-btn" data-row="${op.row||''}"><i class="ti ti-edit"></i></button>`:'';
+  return `<div class="tx-item"><div class="tx-icon" style="background:${cat.bg}"><i class="ti ${cat.icon}" style="color:${cat.color}"></i></div><div class="tx-info"><div class="tx-name">${esc(op.desc||op.category)}</div><div class="tx-meta">${esc(op.category)} · ${esc(op.who||'')} · ${fmtDate(op.date)} ${cardBadge}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="tx-amount ${plus?'plus':'minus'}">${plus?'+':'−'}${fmtMoney(op.amount,op.currency)}</div>${editBtn}</div></div>`;
 }
 function renderCatBars(id,by,total){
   const el=document.getElementById(id);if(!el)return;
@@ -202,9 +267,66 @@ function renderDailyChart(byDay){
 function renderOperations(){
   const el=document.getElementById('ops-list');
   let ops=state.operations;
-  if(state.filterActive!=="all")ops=ops.filter(o=>o.type===state.filterActive||o.budget===state.filterActive);
+  if(state.filterActive!=="all")ops=ops.filter(o=>o.type===state.filterActive||o.budget===state.filterActive||o.card===state.filterActive);
   if(!ops.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--c-text-3)">Немає операцій</div>';return;}
-  el.innerHTML=ops.map(txItem).join('');
+  el.innerHTML=ops.map(op=>txItem(op,true)).join('');
+  el.querySelectorAll('.tx-edit-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>openEditModal(btn.dataset.row));
+  });
+}
+function openEditModal(row){
+  const op=state.operations.find(o=>String(o.row)===String(row)||(!row&&o===state.operations[0]));
+  if(!op)return;
+  let old2=document.getElementById('edit-op-modal');if(old2)old2.remove();
+  const cards=getCards();
+  const cardOpts=cards.map(c=>`<option value="${esc(c.id)}" ${op.card===c.id?'selected':''}>${esc(c.id)}</option>`).join('');
+  const cats=[...getExpCats(),...getIncCats()];
+  const catOpts=cats.map(c=>`<option value="${esc(c.id)}" ${op.category===c.id?'selected':''}>${esc(c.id)}</option>`).join('');
+  const div=document.createElement('div');
+  div.id='edit-op-modal';
+  div.style.cssText='position:fixed;inset:0;z-index:500;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);';
+  div.innerHTML=`<div style="background:var(--c-card);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;">
+    <div style="width:40px;height:4px;background:var(--c-border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Редагувати операцію</div>
+    <div class="modal-row"><label class="modal-label">Тип</label>
+      <select id="edit-type" class="desc-input" style="margin-bottom:0">
+        <option value="Витрата" ${op.type==='Витрата'?'selected':''}>Витрата</option>
+        <option value="Дохід" ${op.type==='Дохід'?'selected':''}>Дохід</option>
+      </select></div>
+    <div class="modal-row"><label class="modal-label">Сума</label>
+      <input id="edit-amount" type="number" class="desc-input" value="${op.amount||''}" style="margin-bottom:0"></div>
+    <div class="modal-row"><label class="modal-label">Категорія</label>
+      <select id="edit-cat" class="desc-input" style="margin-bottom:0">${catOpts}</select></div>
+    <div class="modal-row"><label class="modal-label">Рахунок</label>
+      <select id="edit-card" class="desc-input" style="margin-bottom:0">${cardOpts}</select></div>
+    <div class="modal-row"><label class="modal-label">Опис</label>
+      <input id="edit-desc" type="text" class="desc-input" value="${esc(op.desc||'')}" style="margin-bottom:0"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;">
+      <button id="edit-delete-btn" style="flex:1;padding:13px;border-radius:14px;background:var(--c-red-soft);color:var(--c-red);font-size:14px;font-weight:700;">Видалити</button>
+      <button id="edit-save-btn" style="flex:2;padding:13px;border-radius:14px;background:var(--c-accent);color:#fff;font-size:14px;font-weight:700;">Зберегти</button>
+    </div>
+  </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click',e=>{if(e.target===div)div.remove();});
+  div.querySelector('#edit-save-btn').addEventListener('click',async()=>{
+    const newAmt=parseFloat(div.querySelector('#edit-amount').value);
+    if(!newAmt||newAmt<=0){showToast('Вкажи суму','error');return;}
+    const body={action:'updateOperation',row:op.row,type:div.querySelector('#edit-type').value,amount:newAmt,category:div.querySelector('#edit-cat').value,card:div.querySelector('#edit-card').value,desc:div.querySelector('#edit-desc').value,currency:op.currency||'UAH'};
+    try{
+      if(state.scriptUrl)await apiPost(body);
+      // Update local
+      Object.assign(op,{type:body.type,amount:newAmt,amountUah:newAmt,category:body.category,card:body.card,desc:body.desc});
+      div.remove();renderOperations();renderAccountChips();showToast('✅ Збережено!');
+    }catch(e){showToast('Помилка','error');}
+  });
+  div.querySelector('#edit-delete-btn').addEventListener('click',async()=>{
+    if(!confirm('Видалити операцію?'))return;
+    try{
+      if(state.scriptUrl&&op.row)await apiPost({action:'deleteOperation',row:op.row});
+      state.operations=state.operations.filter(o=>o!==op);
+      div.remove();renderOperations();renderAccountChips();showToast('Видалено');
+    }catch(e){showToast('Помилка','error');}
+  });
 }
 
 // ── RENDER CALENDAR ───────────────────────────────────────────────
@@ -410,13 +532,12 @@ function renderDemoData(page){
 
 // ── MODALS ────────────────────────────────────────────────────────
 function openModal(type){
-  state.currentType=type||'Витрата';state.currentCurrency='UAH';state.selectedCat='';
-  renderCatGrid();updateModalType();
+  state.currentType=type||'Витрата';state.currentCurrency='UAH';state.selectedCat='';state.selectedCard='';
+  renderCatGrid();renderCardGrid();updateModalType();
   document.getElementById('amount-input').value='';
   document.getElementById('desc-input').value='';
   document.getElementById('currency-btn').innerHTML='UAH <i class="ti ti-chevron-down"></i>';
   document.getElementById('amount-cur-icon').textContent='₴';
-  // Set current datetime
   const now=new Date();
   const local=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
   document.getElementById('datetime-input').value=local;
@@ -445,6 +566,12 @@ function renderCatGrid(){
   document.getElementById('cat-grid-modal').innerHTML=cats.map(c=>'<div class="cat-cell'+(state.selectedCat===c.id?' selected':'')+'" data-cat="'+esc(c.id)+'"><i class="ti '+c.icon+'"></i><span>'+esc(c.id)+'</span></div>').join('');
   document.querySelectorAll('.cat-cell').forEach(el=>el.addEventListener('click',()=>{state.selectedCat=el.dataset.cat;renderCatGrid();}));
 }
+function renderCardGrid(){
+  const el=document.getElementById('card-grid-modal');if(!el)return;
+  const cards=getCards();
+  el.innerHTML=cards.map(c=>`<div class="cat-cell${state.selectedCard===c.id?' selected':''}" data-card="${esc(c.id)}" style="${state.selectedCard===c.id?'background:'+c.bg+';border-color:'+c.color+';':''}"><i class="ti ${c.icon}" style="color:${state.selectedCard===c.id?c.color:'var(--c-text-2)'}"></i><span>${esc(c.id)}</span></div>`).join('');
+  el.querySelectorAll('[data-card]').forEach(el=>el.addEventListener('click',()=>{state.selectedCard=el.dataset.card;renderCardGrid();}));
+}
 function cycleCurrency(){
   const i=CURRENCIES.indexOf(state.currentCurrency);
   state.currentCurrency=CURRENCIES[(i+1)%CURRENCIES.length];
@@ -459,9 +586,9 @@ async function submitOperation(){
   const dt=dtVal?new Date(dtVal).toISOString():new Date().toISOString();
   const btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='Збереження...';
   try{
-    const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:'Сімейний',date:dt};
+    if(!state.selectedCard){showToast('Вибери рахунок','error');btn.disabled=false;updateModalType();return;}
+    const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:'Сімейний',date:dt,card:state.selectedCard};
     if(state.scriptUrl)await apiPost(body);
-    // Also store locally for calendar
     state.operations.unshift({...body,date:dt,amountUah:amt,who:localStorage.getItem(APP_CONFIG.USERNAME_KEY)||state.user?.name||'Я'});
     closeModal();showToast('✅ Збережено!');
     if(state.currentPage==='dashboard')fetchDashboard();
@@ -565,7 +692,6 @@ async function syncSettingsToSheet(){
   }catch(e){console.warn('Settings sync failed:',e);}
 }
 function applyTheme(t){document.body.setAttribute('data-theme',t);localStorage.setItem(APP_CONFIG.THEME_KEY,t);document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active',b.dataset.theme===t));}
-function applyScale(s){document.documentElement.style.fontSize=(16*parseFloat(s))+'px';localStorage.setItem(APP_CONFIG.SCALE_KEY,s);document.querySelectorAll('.scale-btn').forEach(b=>b.classList.toggle('active',b.dataset.scale===s));}
 
 // ── ICON PICKER ───────────────────────────────────────────────────
 function openIconPicker(mode){
@@ -668,7 +794,6 @@ function bindEvents(){
   // Theme & scale
   document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.theme)));
   document.querySelectorAll('.scale-btn').forEach(b=>b.addEventListener('click',()=>applyScale(b.dataset.scale)));
-  document.querySelectorAll('.font-btn').forEach(b=>b.addEventListener('click',()=>applyFont(b.dataset.font)));
   // Category tabs
   document.querySelectorAll('.cat-tab').forEach(btn=>{
     btn.addEventListener('click',()=>{
