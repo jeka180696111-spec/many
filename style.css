@@ -241,3 +241,8 @@ input,select{font-family:var(--font);color:var(--c-text);}input:focus,select:foc
 @media(max-width:400px){
   .members-columns{grid-template-columns:1fr;}
 }
+
+/* FAB Menu */
+#fab-menu .fab-menu-item{cursor:pointer;}
+#fab-menu .fab-menu-item > div:last-child{transition:transform .15s;}
+#fab-menu .fab-menu-item:hover > div:last-child{transform:scale(1.08);}
