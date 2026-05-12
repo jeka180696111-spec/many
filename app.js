@@ -136,11 +136,16 @@ function showApp(){
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   updateUserUI();navigateTo('dashboard');loadFx();
-  setTimeout(()=>{
-    fetchSettingsFromSheet();
-    // Автоматично налаштовуємо листи при першому підключенні
-    if(state.scriptUrl)apiPost({action:'setup'}).then(r=>{if(r?.success)console.log('Setup:',r.message);}).catch(()=>{});
-  },800);
+  loadSyncQueue(); // відновлюємо чергу з sessionStorage
+  setTimeout(async()=>{
+    // 1. Налаштовуємо листи таблиці (додає колонку M якщо нема)
+    if(state.scriptUrl)apiPost({action:'setup'}).catch(()=>{});
+    // 2. Повний синк: Sheet → App
+    await fullSync(false);
+    showSyncStatus('ok');
+    // 3. Запускаємо авто-синк
+    initSync();
+  },600);
 }
 function hideSplash(){document.getElementById('splash').classList.add('hidden');}
 
@@ -180,14 +185,20 @@ function navigateTo(page){
   loadPageData(page);closeSidebar();
 }
 function loadPageData(page){
+  // Показуємо локальні дані відразу (без затримки)
+  if(page==='dashboard'){if(state.dashboard)renderDashboard(state.dashboard);renderMemberColumns();}
+  else if(page==='operations')renderOperations();
+  else if(page==='calendar')renderCalendar();
+  else if(page==='analytics'){if(state.dashboard)renderAnalytics();}
+  else if(page==='reserve'){if(state.reserve)renderReserve(state.reserve);}
+  else if(page==='goals')renderGoals(getGoals());
+  else if(page==='settings')renderSettingsUI();
+  // Потім підтягуємо з сервера
   if(!state.scriptUrl){renderDemoData(page);return;}
   if(page==='dashboard')fetchDashboard();
   else if(page==='operations')fetchOperations();
-  else if(page==='calendar')renderCalendar();
   else if(page==='analytics')fetchDashboard().then(()=>renderAnalytics());
   else if(page==='reserve')fetchReserve();
-  else if(page==='goals'){renderGoals(getGoals());}
-  else if(page==='settings')renderSettingsUI();
 }
 
 // ── API ───────────────────────────────────────────────────────────
@@ -403,9 +414,9 @@ function openEditModal(row){
   div.querySelector('#edit-delete-btn').addEventListener('click',async()=>{
     if(!confirm('Видалити операцію?'))return;
     try{
-      if(state.scriptUrl&&op.row)await apiPost({action:'deleteOperation',row:op.row});
       state.operations=state.operations.filter(o=>o!==op);
-      div.remove();renderOperations();renderAccountChips();showToast('Видалено');
+      div.remove();renderOperations();renderMemberColumns();showToast('Видалено');
+      if(state.scriptUrl&&op.row){const dBody={action:'deleteOperation',row:op.row};apiPost(dBody).then(()=>showSyncStatus('ok')).catch(()=>{enqueue(dBody);showSyncStatus('pending');});}
     }catch(e){showToast('Помилка','error');}
   });
 }
@@ -743,9 +754,11 @@ async function submitOperation(){
     if(state.currentPage==='dashboard'){renderMemberColumns();renderRecentOps(state.operations);}
     else if(state.currentPage==='operations')renderOperations();
     else if(state.currentPage==='calendar')renderCalendar();
-    // Асинхронно шлемо на сервер
+    // Відправляємо на сервер або в чергу
     if(state.scriptUrl){
-      apiPost(body).then(res=>{if(res?.row)localOp.row=res.row;}).catch(e=>console.warn('Sync error:',e));
+      apiPost(body)
+        .then(res=>{if(res?.row){localOp.row=res.row;showSyncStatus('ok');}})
+        .catch(()=>{enqueue(body);showSyncStatus('pending');});
     }
   }catch(e){console.error(e);showToast('Помилка: '+e.message,'error');}
   finally{btn.disabled=false;updateModalType();}
@@ -772,8 +785,11 @@ async function submitReserve(){
   const amt=parseFloat(document.getElementById('res-amount-input').value);
   if(!amt||amt<=0){showToast('Вкажи суму','error');return;}
   const btn=document.getElementById('res-save-btn');btn.disabled=true;
-  try{if(state.scriptUrl)await apiPost({action:'addReserve',type:state.reserveType,amount:amt,currency:state.reserveCurrency,comment:document.getElementById('res-desc-input').value||''});closeModal();showToast('✅ Збережено!');fetchReserve();}
-  catch(e){showToast('Помилка','error');}finally{btn.disabled=false;}
+  const resBody={action:'addReserve',type:state.reserveType,amount:amt,currency:state.reserveCurrency,comment:document.getElementById('res-desc-input').value||''};
+  closeModal();showToast('✅ Збережено!');btn.disabled=false;
+  if(state.scriptUrl){
+    apiPost(resBody).then(()=>{fetchReserve();showSyncStatus('ok');}).catch(()=>{enqueue(resBody);showSyncStatus('pending');});
+  }
 }
 
 // Goal modal
@@ -871,8 +887,8 @@ function openTransferModal(context){
       if(g[fi]&&g[ti]){g[fi].saved-=amt;g[ti].saved+=amt;saveGoals(g);renderGoals(g);}
     }
 
-    div.remove();renderMemberColumns();showToast('✅ Переказ записано!');
-    if(state.scriptUrl){apiPost(body).catch(e=>console.warn('Transfer sync:',e));}
+    div.remove();renderMemberColumns();renderRecentOps(state.operations);showToast('✅ Переказ записано!');
+    if(state.scriptUrl){apiPost(body).then(()=>showSyncStatus('ok')).catch(()=>{enqueue(body);showSyncStatus('pending');});}
   });
 }
 function submitTransfer(){openTransferModal();}
@@ -887,48 +903,179 @@ function nextMonth(){state.currentMonth=new Date(state.currentMonth.getFullYear(
 
 // ── THEME / SCALE ─────────────────────────────────────────────────
 // applyFont removed
-async function syncSettingsToSheet(){
-  if(!state.scriptUrl||!state.token)return;
-  try{
-    const profiles=getProfiles();
-    await apiPost({
-      action:'updateSettings',
-      expCats:getExpCats(),
-      incCats:getIncCats(),
-      cards:getCards(),
-      cardsEvgen:getCards('Євген'),
-      cardsMarina:getCards('Марина'),
-      profiles:profiles,
-    });
-  }catch(e){console.warn('Settings sync failed:',e);}
+// ═══════════════════════════════════════════════════════
+// SYNC ENGINE — єдина система синхронізації
+// ═══════════════════════════════════════════════════════
+const syncState={
+  queue:[],          // черга операцій що очікують відправки
+  isSyncing:false,
+  lastFullSync:null,
+  pendingSettings:false,
+};
+const SYNC_INTERVAL_MS = 30000; // авто-оновлення кожні 30с
+
+// ── ІНІЦІАЛІЗАЦІЯ SYNC ──────────────────────────────────
+function initSync(){
+  if(!state.scriptUrl)return;
+  // 1. При поверненні у вкладку — одразу синк
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible')fullSync();
+  });
+  // 2. Авто-синк кожні 30 секунд (для синхронізації між Женею і Мариною)
+  setInterval(()=>{ if(document.visibilityState==='visible') fullSync(); }, SYNC_INTERVAL_MS);
+  // 3. Якщо є відкладені операції в черзі — відправляємо
+  flushQueue();
 }
-// Завантажуємо налаштування з таблиці при старті — перезаписуємо localStorage
-async function fetchSettingsFromSheet(){
-  if(!state.scriptUrl||!state.token)return;
+
+// ── ПОВНИЙ SYNC: Sheet → App ────────────────────────────
+async function fullSync(silent=true){
+  if(!state.scriptUrl||!state.token){showSyncStatus('disconnected');return;}
+  if(syncState.isSyncing)return;
+  syncState.isSyncing=true;
+  if(!silent)showSyncStatus('syncing');
   try{
-    const d=await apiGet('settings');
-    if(!d)return;
-    if(d.expCats){localStorage.setItem(APP_CONFIG.EXP_CATS_KEY,JSON.stringify(d.expCats));}
-    if(d.incCats){localStorage.setItem(APP_CONFIG.INC_CATS_KEY,JSON.stringify(d.incCats));}
-    if(d.cards){localStorage.setItem(APP_CONFIG.CARDS_KEY,JSON.stringify(d.cards));}
-    if(d.cardsEvgen){localStorage.setItem(APP_CONFIG.CARDS_KEY+'_Євген',JSON.stringify(d.cardsEvgen));}
-    if(d.cardsMarina){localStorage.setItem(APP_CONFIG.CARDS_KEY+'_Марина',JSON.stringify(d.cardsMarina));}
-    if(d.profiles){
-      localStorage.setItem(APP_CONFIG.PROFILES_KEY,JSON.stringify(d.profiles));
+    // Паралельно тягнемо все
+    const [dash, ops, settings] = await Promise.all([
+      apiGet('dashboard').catch(()=>null),
+      apiGet('operations',{month:fmtMonth(state.currentMonth)}).catch(()=>null),
+      apiGet('settings').catch(()=>null),
+    ]);
+
+    // Застосовуємо дані
+    if(dash){ state.dashboard=dash; renderDashboard(dash); }
+    if(ops && ops.operations){
+      // Мержимо: сервер правда, але зберігаємо локальні без row (ще не збережені)
+      const localPending=state.operations.filter(o=>!o.row);
+      state.operations=[...localPending,...ops.operations];
+      if(state.currentPage==='operations')renderOperations();
+      if(state.currentPage==='calendar')renderCalendar();
+    }
+    if(settings) applySettings(settings);
+
+    // Завжди оновлюємо колонки членів після синку
+    renderMemberColumns();
+
+    syncState.lastFullSync=new Date();
+    localStorage.setItem(APP_CONFIG.LAST_SYNC_KEY, syncState.lastFullSync.toISOString());
+    showSyncStatus('ok');
+
+    // Відправляємо відкладені операції
+    await flushQueue();
+
+  }catch(e){
+    console.warn('Sync error:',e);
+    showSyncStatus('error');
+  }finally{
+    syncState.isSyncing=false;
+  }
+}
+
+// ── ЗАСТОСОВУЄМО SETTINGS з Sheet → localStorage + UI ──
+function applySettings(d){
+  if(!d)return;
+  let changed=false;
+  const setIfNew=(key,val)=>{
+    if(!val)return;
+    const cur=localStorage.getItem(key);
+    const newStr=JSON.stringify(val);
+    if(cur!==newStr){localStorage.setItem(key,newStr);changed=true;}
+  };
+  setIfNew(APP_CONFIG.EXP_CATS_KEY, d.expCats);
+  setIfNew(APP_CONFIG.INC_CATS_KEY, d.incCats);
+  setIfNew(APP_CONFIG.CARDS_KEY+'_Євген',  d.cardsEvgen);
+  setIfNew(APP_CONFIG.CARDS_KEY+'_Марина', d.cardsMarina);
+
+  if(d.profiles){
+    const profStr=JSON.stringify(d.profiles);
+    if(localStorage.getItem(APP_CONFIG.PROFILES_KEY)!==profStr){
+      localStorage.setItem(APP_CONFIG.PROFILES_KEY,profStr);
+      changed=true;
       // Застосовуємо профіль поточного юзера
       const member=getMyMember();
       const myProf=d.profiles[member];
       if(myProf){
-        if(myProf.name){localStorage.setItem(APP_CONFIG.USERNAME_KEY,myProf.name);updateUserUI();}
-        if(myProf.avatar){localStorage.setItem(APP_CONFIG.AVATAR_KEY,myProf.avatar);applyAvatar(myProf.avatar);}
+        if(myProf.name&&myProf.name!==localStorage.getItem(APP_CONFIG.USERNAME_KEY)){
+          localStorage.setItem(APP_CONFIG.USERNAME_KEY,myProf.name);
+          updateUserUI();
+        }
+        if(myProf.avatar&&myProf.avatar!==localStorage.getItem(APP_CONFIG.AVATAR_KEY)){
+          localStorage.setItem(APP_CONFIG.AVATAR_KEY,myProf.avatar);
+          applyAvatar(myProf.avatar);
+        }
       }
     }
-    localStorage.setItem(APP_CONFIG.LAST_SYNC_KEY,new Date().toISOString());
-    // Оновлюємо UI якщо на дашборді
-    if(state.currentPage==='dashboard')renderMemberColumns();
-    if(state.currentPage==='settings')renderSettingsUI();
-  }catch(e){console.warn('Fetch settings failed:',e);}
+  }
+  if(changed&&state.currentPage==='settings') renderSettingsUI();
 }
+
+// ── ЧЕРГА ВІДКЛАДЕНИХ ОПЕРАЦІЙ ──────────────────────────
+// Якщо API недоступний — операція іде в чергу і відправляється пізніше
+function enqueue(body){
+  syncState.queue.push({body,ts:Date.now()});
+  saveSyncQueue();
+}
+function saveSyncQueue(){
+  try{sessionStorage.setItem('sync_queue',JSON.stringify(syncState.queue));}catch{}
+}
+function loadSyncQueue(){
+  try{const s=sessionStorage.getItem('sync_queue');if(s)syncState.queue=JSON.parse(s);}catch{}
+}
+async function flushQueue(){
+  if(!state.scriptUrl||!state.token||!syncState.queue.length)return;
+  const toSend=[...syncState.queue];
+  syncState.queue=[];saveSyncQueue();
+  for(const item of toSend){
+    try{
+      const res=await apiPost(item.body);
+      // Якщо отримали row — оновлюємо локальну операцію
+      if(res?.row&&item.body.action==='addOperation'){
+        const localOp=state.operations.find(o=>!o.row&&o.desc===item.body.desc&&o.amount==item.body.amount);
+        if(localOp)localOp.row=res.row;
+      }
+    }catch(e){
+      // Повертаємо в чергу
+      syncState.queue.push(item);
+      saveSyncQueue();
+      console.warn('Queue flush failed:',e);
+      break;
+    }
+  }
+  if(syncState.queue.length)showSyncStatus('pending');
+}
+
+// ── СТАТУС СИНХРОНІЗАЦІЇ ────────────────────────────────
+function showSyncStatus(status){
+  const el=document.getElementById('sync-status');if(!el)return;
+  const map={
+    ok:     {text:'● Синхронізовано '+new Date().toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}), color:'var(--c-green)'},
+    syncing:{text:'↻ Синхронізація...', color:'var(--c-accent)'},
+    pending:{text:'⏳ Очікує '+syncState.queue.length+' операцій', color:'#f59e0b'},
+    error:  {text:'✕ Помилка синку', color:'var(--c-red)'},
+    disconnected:{text:'○ Не підключено', color:'var(--c-text-3)'},
+  };
+  const s=map[status]||map.ok;
+  el.textContent=s.text;el.style.color=s.color;
+  // Також топбар індикатор
+  const dot=document.getElementById('sync-dot');
+  if(dot){dot.style.background=status==='ok'?'var(--c-green)':status==='error'?'var(--c-red)':'#f59e0b';}
+}
+
+// ── ПУБЛІЧНІ АЛІАСИ (для зворотної сумісності) ──────────
+async function syncSettingsToSheet(){
+  if(!state.scriptUrl||!state.token){syncState.pendingSettings=true;return;}
+  try{
+    await apiPost({
+      action:'updateSettings',
+      expCats:getExpCats(),
+      incCats:getIncCats(),
+      cardsEvgen:getCards('Євген'),
+      cardsMarina:getCards('Марина'),
+      profiles:getProfiles(),
+    });
+    syncState.pendingSettings=false;
+  }catch(e){syncState.pendingSettings=true;console.warn('Settings sync:',e);}
+}
+async function fetchSettingsFromSheet(){ await fullSync(true); }
 function applyTheme(t){document.body.setAttribute('data-theme',t);localStorage.setItem(APP_CONFIG.THEME_KEY,t);document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active',b.dataset.theme===t));}
 
 // ── ICON PICKER ───────────────────────────────────────────────────
@@ -987,7 +1134,7 @@ function openIconPicker(mode){
     const item={id:name,icon:selIcon,bg:selColor.bg,color:selColor.color};
     if(mode==='expense'){const list=getExpCats();list.push(item);localStorage.setItem(APP_CONFIG.EXP_CATS_KEY,JSON.stringify(list));syncSettingsToSheet();}
     else if(mode==='income'){const list=getIncCats();list.push(item);localStorage.setItem(APP_CONFIG.INC_CATS_KEY,JSON.stringify(list));syncSettingsToSheet();}
-    else if(baseMode==='card'){saveCards([...getCards(memberForCard),item],memberForCard);renderMemberColumns();}
+    else if(baseMode==='card'){saveCards([...getCards(memberForCard),item],memberForCard);renderMemberColumns();renderSettingsUI();}
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     renderSettingsUI();div.remove();showToast('✅ Додано!');
   });
@@ -1092,7 +1239,8 @@ function bindEvents(){
   // Settings
   document.getElementById('logout-btn').addEventListener('click',logout);
   document.getElementById('set-url-btn').addEventListener('click',setScriptUrl);
-  // sync-now-btn handled above
+  const syncNow=document.getElementById('sync-now-btn');
+  if(syncNow)syncNow.addEventListener('click',async()=>{showToast('🔄 Синхронізація...');await fullSync(false);showToast('✅ Синхронізовано!');});
   // Family name
   document.getElementById('save-family-btn').addEventListener('click',()=>{
     const v=document.getElementById('family-name-input').value.trim();
