@@ -1,27 +1,35 @@
-// ════════ config.js ════════
-// ═══════════════════════════════
-// CONFIG — APP_CONFIG, state, constants
-// ═══════════════════════════════
 'use strict';
-const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL:'https://script.google.com/macros/s/AKfycbwlZdxmHbaCVEJ5XmvA3oLEOHgGAPHzoGgXmB4OKgSmbhbH1whzid4YHNKvLMQiaczbbA/exec',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina',PROFILES_KEY:'budget_profiles',LAST_SYNC_KEY:'budget_last_sync',TRANSFERS_KEY:'budget_transfers',SECRET_KEY:'budget2026koval'};
+const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina',PROFILES_KEY:'budget_profiles',LAST_SYNC_KEY:'budget_last_sync',TRANSFERS_KEY:'budget_transfers',SECRET_KEY:'budget2026koval',SCRIPT_URL:'https://script.google.com/macros/s/AKfycbwlZdxmHbaCVEJ5XmvA3oLEOHgGAPHzoGgXmB4OKgSmbhbH1whzid4YHNKvLMQiaczbbA/exec'};
 const ICON_LIST=['ti-shopping-cart','ti-car','ti-home','ti-tools-kitchen-2','ti-heart','ti-shirt','ti-device-gamepad-2','ti-sofa','ti-baby-carriage','ti-dots','ti-briefcase','ti-coin','ti-plane','ti-book','ti-coffee','ti-paw','ti-phone','ti-gift','ti-bike','ti-pill','ti-school','ti-sport-billard','ti-music','ti-bus','ti-credit-card','ti-cash','ti-building-bank','ti-star','ti-pizza','ti-salad','ti-droplet','ti-bolt','ti-wifi','ti-device-laptop','ti-tools','ti-shirt-sport','ti-garden-cart','ti-vaccine','ti-receipt'];
-const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',modalMember:null,dashboard:null,reserve:null,operations:[],goals:[],transfers:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null,editingOp:null};
+const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),calPeriod:'month',currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',modalMember:null,dashboard:null,reserve:null,operations:[],goals:[],transfers:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null,editingOp:null};
 const CURRENCIES=['UAH','USD','EUR'],CUR_SYMBOLS={UAH:'₴',USD:'$',EUR:'€'};
 const MONTH_UK=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const DEFAULT_EXP_CATS=[{id:'Продукти',icon:'ti-shopping-cart',bg:'#E1F5EE',color:'#085041'},{id:'Транспорт',icon:'ti-car',bg:'#FAECE7',color:'#712B13'},{id:'Комунальні',icon:'ti-home',bg:'#E6F1FB',color:'#0C447C'},{id:'Ресторани',icon:'ti-tools-kitchen-2',bg:'#FEF3E2',color:'#633806'},{id:"Здоров'я",icon:'ti-heart',bg:'#FBEAF0',color:'#72243E'},{id:'Одяг',icon:'ti-shirt',bg:'#EEEDFE',color:'#3C3489'},{id:'Розваги',icon:'ti-device-gamepad-2',bg:'#F0F4FF',color:'#2D4AB7'},{id:'Дім',icon:'ti-sofa',bg:'#E6F1FB',color:'#0C447C'},{id:'Дитячі',icon:'ti-baby-carriage',bg:'#FBEAF0',color:'#72243E'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
 const DEFAULT_INC_CATS=[{id:'Зарплата',icon:'ti-briefcase',bg:'#EAF3DE',color:'#27500A'},{id:'Підробіток',icon:'ti-coin',bg:'#FEF3E2',color:'#633806'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
-const DEFAULT_CARDS=[{id:'Готівка',icon:'ti-cash',bg:'#EAF3DE',color:'#27500A'},{id:'Моно чорна',icon:'ti-credit-card',bg:'#1a1a2e',color:'#fff'},{id:'ПУМБ',icon:'ti-credit-card',bg:'#E6F1FB',color:'#0C447C'},{id:'Приват',icon:'ti-credit-card',bg:'#FBEAF0',color:'#72243E'},{id:'Кредитна',icon:'ti-credit-card',bg:'#FAEEDA',color:'#633806'}];
+// Групи рахунків — кожен рахунок належить до групи
+const CARD_GROUPS=[
+  {id:'cards',    label:'Картки',      icon:'ti-credit-card', color:'#185FA5'},
+  {id:'cash',     label:'Готівка',     icon:'ti-cash',        color:'#1D9E75'},
+  {id:'credit',   label:'Кредитні',    icon:'ti-credit-card-refund', color:'#D85A30'},
+  {id:'savings',  label:'Заощадження', icon:'ti-piggy-bank',  color:'#7F77DD'},
+];
+const DEFAULT_CARDS=[
+  {id:'Моно чорна', icon:'ti-credit-card',        bg:'#1a1a2e',  color:'#fff',     group:'cards'},
+  {id:'ПУМБ',       icon:'ti-credit-card',        bg:'#E6F1FB',  color:'#0C447C',  group:'cards'},
+  {id:'Приват',     icon:'ti-credit-card',        bg:'#FBEAF0',  color:'#72243E',  group:'cards'},
+  {id:'Готівка UAH',icon:'ti-cash',               bg:'#EAF3DE',  color:'#27500A',  group:'cash'},
+  {id:'Готівка USD',icon:'ti-cash',               bg:'#E6F1FB',  color:'#185FA5',  group:'cash'},
+  {id:'Готівка EUR',icon:'ti-cash',               bg:'#EEEDFE',  color:'#7F77DD',  group:'cash'},
+  {id:'Кредитна',   icon:'ti-credit-card-refund', bg:'#FAEEDA',  color:'#633806',  group:'credit'},
+  {id:'Банка UAH',  icon:'ti-piggy-bank',         bg:'#EAF3DE',  color:'#1D9E75',  group:'savings', isSavings:true},
+  {id:'Банка USD',  icon:'ti-piggy-bank',         bg:'#E6F1FB',  color:'#185FA5',  group:'savings', isSavings:true},
+  {id:'Банка EUR',  icon:'ti-piggy-bank',         bg:'#EEEDFE',  color:'#7F77DD',  group:'savings', isSavings:true},
+];
 // Два члени сім'ї — константа для дашборду і операцій
 const FAMILY_MEMBERS=['Євген','Марина'];
 // Кольори членів
 const MEMBER_COLORS={Євген:{bg:'var(--c-blue-soft)',cl:'var(--c-blue)',initials:'ЄК'},Марина:{bg:'var(--c-pink-soft)',cl:'var(--c-pink)',initials:'МК'}};
 // ── HELPERS ──────────────────────────────────────────────────────
-
-
-// ════════ storage.js ════════
-// ═══════════════════════════════
-// STORAGE — localStorage helpers
-// ═══════════════════════════════
 function getExpCats(){try{const s=localStorage.getItem(APP_CONFIG.EXP_CATS_KEY);return s?JSON.parse(s):DEFAULT_EXP_CATS;}catch{return DEFAULT_EXP_CATS;}}
 function getIncCats(){try{const s=localStorage.getItem(APP_CONFIG.INC_CATS_KEY);return s?JSON.parse(s):DEFAULT_INC_CATS;}catch{return DEFAULT_INC_CATS;}}
 // Картки по члену: getCards('Євген') або getCards() → спільні
@@ -88,23 +96,151 @@ function setText(id,v){const el=document.getElementById(id);if(el)el.textContent
 function showToast(msg,type='success'){const t=document.createElement('div');t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:'+(type==='error'?'var(--c-red)':'var(--c-green)')+';color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:1000;box-shadow:0 4px 16px rgba(0,0,0,.2);animation:fadeInUp .2s ease;white-space:nowrap;';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2500);}
 
 // ── INIT ──────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{loadSettings();initGoogleAuth();bindEvents();});
 
+function loadSettings(){
+  const theme=localStorage.getItem(APP_CONFIG.THEME_KEY)||'light';
+  state.scriptUrl=APP_CONFIG.SCRIPT_URL||localStorage.getItem(APP_CONFIG.SCRIPT_URL_KEY)||'';
+  applyTheme(theme);
+  // Load family name
+  const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
+  const fi=document.getElementById('family-name-input');
+  if(fi)fi.value=fam;
+  setText('sb-family-name',fam);
+  // Load avatar
+  const av=localStorage.getItem(APP_CONFIG.AVATAR_KEY);
+  if(av)applyAvatar(av);
+  // Load username
+  const un=localStorage.getItem(APP_CONFIG.USERNAME_KEY);
+  if(un){const ni=document.getElementById('settings-name-input');if(ni)ni.value=un;}
+  // Load mono tokens
+  const me=localStorage.getItem(APP_CONFIG.MONO_EVGEN_KEY);
+  const mm=localStorage.getItem(APP_CONFIG.MONO_MARINA_KEY);
+  if(me){const el=document.getElementById('mono-token-evgen');if(el)el.value=me;}
+  if(mm){const el=document.getElementById('mono-token-marina');if(el)el.value=mm;}
+}
 
-// ════════ api.js ════════
-// ═══════════════════════════════
-// API — server calls + sync
-// ═══════════════════════════════
+// ── AUTH ──────────────────────────────────────────────────────────
+function initGoogleAuth(){
+  if(location.hash.includes('access_token')){handleOAuthRedirect();return;}
+  const u=localStorage.getItem(APP_CONFIG.USER_KEY);
+  const t=localStorage.getItem(APP_CONFIG.TOKEN_KEY);
+  if(u&&t){state.user=JSON.parse(u);state.token=t;showApp();return;}
+  showAuthScreen();
+}
+document.getElementById('google-signin-btn').addEventListener('click',()=>{
+  const params=new URLSearchParams({client_id:APP_CONFIG.GOOGLE_CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:'email profile openid',prompt:'select_account'});
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
+});
+function handleOAuthRedirect(){
+  const hash=location.hash.substring(1);
+  const params=new URLSearchParams(hash);
+  const token=params.get('access_token');
+  if(!token){showAuthScreen();return;}
+  history.replaceState(null,'',location.pathname);
+  fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:'Bearer '+token}})
+  .then(r=>r.json()).then(info=>{
+    state.user={name:info.given_name||info.name,email:info.email};
+    state.token=token;
+    localStorage.setItem(APP_CONFIG.USER_KEY,JSON.stringify(state.user));
+    localStorage.setItem(APP_CONFIG.TOKEN_KEY,token);
+    showApp();
+  }).catch(()=>showAuthScreen());
+}
+function logout(){
+  localStorage.removeItem(APP_CONFIG.USER_KEY);localStorage.removeItem(APP_CONFIG.TOKEN_KEY);
+  state.user=null;state.token=null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+}
+function showAuthScreen(){hideSplash();document.getElementById('auth-screen').classList.remove('hidden');}
+function showApp(){
+  hideSplash();
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  updateUserUI();navigateTo('dashboard');loadFx();
+  loadSyncQueue(); // відновлюємо чергу з sessionStorage
+  setTimeout(async()=>{
+    // 1. Налаштовуємо листи таблиці (додає колонку M якщо нема)
+    if(state.scriptUrl)apiPost({action:'setup'}).catch(()=>{});
+    // 2. Повний синк: Sheet → App
+    await fullSync(false);
+    showSyncStatus('ok');
+    // 3. Запускаємо авто-синк
+    initSync();
+  },600);
+}
+function hideSplash(){document.getElementById('splash').classList.add('hidden');}
+
+// ── USER UI ───────────────────────────────────────────────────────
+function updateUserUI(){
+  const u=state.user;if(!u)return;
+  const savedName=localStorage.getItem(APP_CONFIG.USERNAME_KEY)||u.name;
+  const ini=getInitials(savedName);
+  setText('sb-avatar',ini);setText('sb-user-name',savedName);setText('topbar-av-text',ini);
+  setText('settings-email',u.email);
+  const ni=document.getElementById('settings-name-input');if(ni)ni.value=savedName;
+  setText('greeting-text',getGreeting(savedName));
+  const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
+  setText('sb-family-name',fam);
+  const fi=document.getElementById('family-name-input');if(fi)fi.value=fam;
+  const pap=document.getElementById('profile-av-placeholder');if(pap)pap.textContent=ini;
+}
+function getInitials(n){return(n||'').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2)||'?';}
+function getGreeting(n){const h=new Date().getHours();const g=h<12?'Доброго ранку':h<18?'Привіт':'Добрий вечір';return g+', '+n+' 👋';}
+function applyAvatar(dataUrl){
+  const ids=['sb-avatar-img','topbar-av-img','profile-av-img'];
+  const hideIds=['sb-avatar','topbar-av-text','profile-av-placeholder'];
+  ids.forEach(id=>{const el=document.getElementById(id);if(el){el.src=dataUrl;el.style.display='block';}});
+  hideIds.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────────
+function navigateTo(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.sb-item,.bn-item').forEach(i=>i.classList.remove('active'));
+  const el=document.getElementById('page-'+page);
+  if(el)el.classList.add('active');
+  document.querySelectorAll('[data-page="'+page+'"]').forEach(e=>e.classList.add('active'));
+  state.currentPage=page;
+  const titles={dashboard:'Дашборд',operations:'Операції',calendar:'Календар',analytics:'Аналіз',reserve:'Резерв',goals:'Цілі',settings:'Налаштування'};
+  setText('topbar-title',titles[page]||page);
+  loadPageData(page);closeSidebar();
+}
+function loadPageData(page){
+  // Показуємо локальні дані відразу (без затримки)
+  if(page==='dashboard'){if(state.dashboard)renderDashboard(state.dashboard);renderMemberColumns();}
+  else if(page==='operations')renderOperations();
+  else if(page==='calendar')renderCalendar();
+  else if(page==='analytics'){if(state.dashboard)renderAnalytics();}
+  else if(page==='reserve'){if(state.reserve)renderReserve(state.reserve);}
+  else if(page==='goals'){
+    // Спочатку показуємо локальні
+    const localGoals=getGoals();
+    if(localGoals.length)renderGoals(localGoals);
+    // Потім тягнемо з Sheet
+    if(state.scriptUrl)fetchGoals();
+    else renderDemoData('goals');
+  }
+  else if(page==='settings')renderSettingsUI();
+  // Тягнемо з сервера
+  if(!state.scriptUrl){renderDemoData(page);return;}
+  if(page==='dashboard')fetchDashboard().then(()=>fetchOperations());
+  else if(page==='operations')fetchOperations();
+  else if(page==='analytics')fetchDashboard().then(()=>renderAnalytics());
+  else if(page==='reserve')fetchReserve();
+}
+
+// ── API ───────────────────────────────────────────────────────────
 async function apiGet(action,params={}){
   if(!state.scriptUrl)return null;
   const url=new URL(state.scriptUrl);
-  url.searchParams.set('action',action);url.searchParams.set('key',APP_CONFIG.SECRET_KEY);
-  url.searchParams.set('token',state.token||'');
+  url.searchParams.set('action',action);url.searchParams.set('key',APP_CONFIG.SECRET_KEY);url.searchParams.set('token',state.token||'');
   Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
   const r=await fetch(url.toString());if(!r.ok)throw new Error('API '+r.status);return r.json();
 }
 async function apiPost(body){
   if(!state.scriptUrl)return null;
-  // GET tunnel — Apps Script не підтримує CORS preflight на POST
   const url=new URL(state.scriptUrl);
   url.searchParams.set('method','POST');
   url.searchParams.set('key',APP_CONFIG.SECRET_KEY);
@@ -129,15 +265,9 @@ async function fetchGoals(){
     }
   }catch(e){console.warn('fetchGoals:',e);}
 }
-async function loadFx(){try{const d=state.scriptUrl?await apiGet('fx'):null;if(d){state.fx=d;setText('fx-usd',d.USD?.mid?.toFixed(2)+' ₴');setText('fx-eur',d.EUR?.mid?.toFixed(2)+' ₴');}}catch(e){}}
+async function loadFx(){try{const d=state.scriptUrl?await apiGet('fx'):null;if(d){state.fx=d;setText('fx-usd','USD '+d.USD?.mid?.toFixed(2)+' ₴');setText('fx-eur','EUR '+d.EUR?.mid?.toFixed(2)+' ₴');}}catch(e){}}
 
 // ── RENDER DASHBOARD ─────────────────────────────────────────────
-
-
-// ════════ render.js ════════
-// ═══════════════════════════════
-// RENDER — all render functions
-// ═══════════════════════════════
 function renderDashboard(d){
   setText('dash-income',fmtMoney(d.totalIncome,'UAH'));
   setText('dash-expense',fmtMoney(d.totalExpense,'UAH'));
@@ -473,12 +603,6 @@ function renderGoals(goals){
 }
 
 // ── RENDER SETTINGS ───────────────────────────────────────────────
-
-
-// ════════ settings.js ════════
-// ═══════════════════════════════
-// SETTINGS — settings page
-// ═══════════════════════════════
 function renderSettingsUI(){
   const el=document.getElementById('script-url-preview');
   if(el) el.textContent=state.scriptUrl?state.scriptUrl.substring(0,50)+'…':'Не налаштовано';
@@ -557,17 +681,37 @@ function renderCatsList(containerId,cats,isIncome){
 }
 function renderCardsList(containerId,cards,member){
   const el=document.getElementById(containerId);if(!el)return;
-  el.innerHTML=cards.map((c,i)=>`<div class="cat-accordion-item"><div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div><div class="cat-accordion-name">${esc(c.id)}</div><button class="cat-del-btn" data-idx="${i}" data-member="${esc(member||'')}"><i class="ti ti-x"></i></button></div>`).join('');
+  // Group cards by group type
+  const grouped={};
+  CARD_GROUPS.forEach(g=>{grouped[g.id]=[];});
+  cards.forEach((c,i)=>{
+    const gid=c.group||'cards';
+    if(!grouped[gid])grouped[gid]=[];
+    grouped[gid].push({...c,_idx:i});
+  });
+  let html='';
+  CARD_GROUPS.forEach(g=>{
+    const grpCards=grouped[g.id]||[];
+    if(!grpCards.length)return;
+    html+=`<div class="cards-group-label"><i class="ti ${g.icon}" style="color:${g.color}"></i>${g.label}</div>`;
+    html+=grpCards.map(c=>`<div class="cat-accordion-item">
+      <div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
+      <div class="cat-accordion-name">${esc(c.id)}</div>
+      <button class="cat-del-btn" data-idx="${c._idx}" data-member="${esc(member||'')}"><i class="ti ti-x"></i></button>
+    </div>`).join('');
+  });
+  el.innerHTML=html;
   el.querySelectorAll('.cat-del-btn').forEach(b=>{
     b.addEventListener('click',()=>{
-      const m=b.dataset.member||null;
-      const list=getCards(m);list.splice(parseInt(b.dataset.idx),1);saveCards(list,m);
-      renderSettingsUI();renderMemberColumns();showToast('Картку видалено');
+      const m=b.dataset.member||member;
+      const c=getCards(m);
+      c.splice(parseInt(b.dataset.idx),1);
+      saveCards(c,m);
+      renderCardsList(containerId,getCards(m),m);
+      syncSettingsToSheet();
     });
   });
 }
-
-// ── DEMO DATA ─────────────────────────────────────────────────────
 function renderDemoData(page){
   if(page==='dashboard'){
     // Генеруємо демо операції по рахунках
@@ -617,12 +761,6 @@ function renderDemoData(page){
 }
 
 // ── MODALS ────────────────────────────────────────────────────────
-
-
-// ════════ modals.js ════════
-// ═══════════════════════════════
-// MODALS — all modals & forms
-// ═══════════════════════════════
 function openModal(type){
   state.currentType=type||'Витрата';state.currentCurrency='UAH';state.selectedCat='';state.selectedCard='';
   state.modalMember=getMyMember(); // дефолт — поточний юзер
@@ -1146,154 +1284,6 @@ function setScriptUrl(){
 }
 
 // ── BIND EVENTS ───────────────────────────────────────────────────
-
-
-// ════════ init.js ════════
-// ═══════════════════════════════
-// INIT — auth, navigation, startup
-// ═══════════════════════════════
-window.addEventListener('DOMContentLoaded',()=>{loadSettings();initGoogleAuth();bindEvents();});
-
-function loadSettings(){
-  const theme=localStorage.getItem(APP_CONFIG.THEME_KEY)||'light';
-  state.scriptUrl=APP_CONFIG.SCRIPT_URL||localStorage.getItem(APP_CONFIG.SCRIPT_URL_KEY)||'';
-  applyTheme(theme);
-  // Load family name
-  const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
-  const fi=document.getElementById('family-name-input');
-  if(fi)fi.value=fam;
-  setText('sb-family-name',fam);
-  // Load avatar
-  const av=localStorage.getItem(APP_CONFIG.AVATAR_KEY);
-  if(av)applyAvatar(av);
-  // Load username
-  const un=localStorage.getItem(APP_CONFIG.USERNAME_KEY);
-  if(un){const ni=document.getElementById('settings-name-input');if(ni)ni.value=un;}
-  // Load mono tokens
-  const me=localStorage.getItem(APP_CONFIG.MONO_EVGEN_KEY);
-  const mm=localStorage.getItem(APP_CONFIG.MONO_MARINA_KEY);
-  if(me){const el=document.getElementById('mono-token-evgen');if(el)el.value=me;}
-  if(mm){const el=document.getElementById('mono-token-marina');if(el)el.value=mm;}
-}
-
-// ── AUTH ──────────────────────────────────────────────────────────
-function initGoogleAuth(){
-  if(location.hash.includes('access_token')){handleOAuthRedirect();return;}
-  const u=localStorage.getItem(APP_CONFIG.USER_KEY);
-  const t=localStorage.getItem(APP_CONFIG.TOKEN_KEY);
-  if(u&&t){state.user=JSON.parse(u);state.token=t;showApp();return;}
-  showAuthScreen();
-}
-document.getElementById('google-signin-btn').addEventListener('click',()=>{
-  const params=new URLSearchParams({client_id:APP_CONFIG.GOOGLE_CLIENT_ID,redirect_uri:location.origin+location.pathname,response_type:'token',scope:'email profile openid',prompt:'select_account'});
-  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params.toString();
-});
-function handleOAuthRedirect(){
-  const hash=location.hash.substring(1);
-  const params=new URLSearchParams(hash);
-  const token=params.get('access_token');
-  if(!token){showAuthScreen();return;}
-  history.replaceState(null,'',location.pathname);
-  fetch('https://www.googleapis.com/oauth2/v2/userinfo',{headers:{Authorization:'Bearer '+token}})
-  .then(r=>r.json()).then(info=>{
-    state.user={name:info.given_name||info.name,email:info.email};
-    state.token=token;
-    localStorage.setItem(APP_CONFIG.USER_KEY,JSON.stringify(state.user));
-    localStorage.setItem(APP_CONFIG.TOKEN_KEY,token);
-    showApp();
-  }).catch(()=>showAuthScreen());
-}
-function logout(){
-  localStorage.removeItem(APP_CONFIG.USER_KEY);localStorage.removeItem(APP_CONFIG.TOKEN_KEY);
-  state.user=null;state.token=null;
-  document.getElementById('app').classList.add('hidden');
-  document.getElementById('auth-screen').classList.remove('hidden');
-}
-function showAuthScreen(){hideSplash();document.getElementById('auth-screen').classList.remove('hidden');}
-function showApp(){
-  hideSplash();
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  updateUserUI();navigateTo('dashboard');loadFx();
-  loadSyncQueue(); // відновлюємо чергу з sessionStorage
-  setTimeout(async()=>{
-    // 1. Налаштовуємо листи таблиці (додає колонку M якщо нема)
-    if(state.scriptUrl)apiPost({action:'setup'}).catch(()=>{});
-    // 2. Повний синк: Sheet → App
-    await fullSync(false);
-    showSyncStatus('ok');
-    // 3. Запускаємо авто-синк
-    initSync();
-  },600);
-}
-function hideSplash(){document.getElementById('splash').classList.add('hidden');}
-
-// ── USER UI ───────────────────────────────────────────────────────
-function updateUserUI(){
-  const u=state.user;if(!u)return;
-  const savedName=localStorage.getItem(APP_CONFIG.USERNAME_KEY)||u.name;
-  const ini=getInitials(savedName);
-  setText('sb-avatar',ini);setText('sb-user-name',savedName);setText('topbar-av-text',ini);
-  setText('settings-email',u.email);
-  const ni=document.getElementById('settings-name-input');if(ni)ni.value=savedName;
-  setText('greeting-text',getGreeting(savedName));
-  const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
-  setText('sb-family-name',fam);
-  const fi=document.getElementById('family-name-input');if(fi)fi.value=fam;
-  const pap=document.getElementById('profile-av-placeholder');if(pap)pap.textContent=ini;
-}
-function getInitials(n){return(n||'').split(' ').map(w=>w[0]).join('').toUpperCase().substring(0,2)||'?';}
-function getGreeting(n){const h=new Date().getHours();const g=h<12?'Доброго ранку':h<18?'Привіт':'Добрий вечір';return g+', '+n+' 👋';}
-function applyAvatar(dataUrl){
-  const ids=['sb-avatar-img','topbar-av-img','profile-av-img'];
-  const hideIds=['sb-avatar','topbar-av-text','profile-av-placeholder'];
-  ids.forEach(id=>{const el=document.getElementById(id);if(el){el.src=dataUrl;el.style.display='block';}});
-  hideIds.forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
-}
-
-// ── NAVIGATION ────────────────────────────────────────────────────
-function navigateTo(page){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.sb-item,.bn-item').forEach(i=>i.classList.remove('active'));
-  const el=document.getElementById('page-'+page);
-  if(el)el.classList.add('active');
-  document.querySelectorAll('[data-page="'+page+'"]').forEach(e=>e.classList.add('active'));
-  state.currentPage=page;
-  const titles={dashboard:'Дашборд',operations:'Операції',calendar:'Календар',analytics:'Аналіз',reserve:'Накопичення',settings:'Налаштування'};
-  setText('topbar-title',titles[page]||page);
-  loadPageData(page);closeSidebar();
-}
-function loadPageData(page){
-  // Показуємо локальні дані відразу (без затримки)
-  if(page==='dashboard'){if(state.dashboard)renderDashboard(state.dashboard);renderMemberColumns();}
-  else if(page==='operations')renderOperations();
-  else if(page==='calendar')renderCalendar();
-  else if(page==='analytics'){if(state.dashboard)renderAnalytics();}
-  else if(page==='reserve'){if(state.reserve)renderReserve(state.reserve);}
-  else if(page==='goals'){
-    // Спочатку показуємо локальні
-    const localGoals=getGoals();
-    if(localGoals.length)renderGoals(localGoals);
-    // Потім тягнемо з Sheet
-    if(state.scriptUrl)fetchGoals();
-    else renderDemoData('goals');
-  }
-  else if(page==='settings')renderSettingsUI();
-  // Тягнемо з сервера
-  if(!state.scriptUrl){renderDemoData(page);return;}
-  if(page==='dashboard')fetchDashboard().then(()=>fetchOperations());
-  else if(page==='operations')fetchOperations();
-  else if(page==='analytics')fetchDashboard().then(()=>renderAnalytics());
-  else if(page==='reserve')fetchReserve();
-}
-
-// ── API ───────────────────────────────────────────────────────────
-
-
-// ════════ events.js ════════
-// ═══════════════════════════════
-// EVENTS — bindEvents + utils
-// ═══════════════════════════════
 function bindEvents(){
   // Navigation
   document.querySelectorAll('[data-page]').forEach(el=>el.addEventListener('click',e=>{e.preventDefault();navigateTo(el.dataset.page);}));
@@ -1315,7 +1305,7 @@ function bindEvents(){
   document.getElementById('add-btn-dash').addEventListener('click',()=>openModal());
   const aob=document.getElementById('add-btn-ops');if(aob)aob.addEventListener('click',()=>openModal());
   document.getElementById('add-reserve-btn').addEventListener('click',openReserveModal);
-  const _agb=document.getElementById('add-goal-btn');if(_agb)_agb.addEventListener('click',()=>openGoalModal());
+  const _e_add_goal_btn=document.getElementById('add-goal-btn');if(_e_add_goal_btn)_e_add_goal_btn.addEventListener('click',()=>openGoalModal());
   document.getElementById('modal-overlay').addEventListener('click',closeModal);
   // Type toggles
   document.getElementById('tt-expense').addEventListener('click',()=>setType('Витрата'));
@@ -1336,8 +1326,8 @@ function bindEvents(){
     });
   });
   document.getElementById('res-save-btn').addEventListener('click',submitReserve);
-  const _gsb=document.getElementById('goal-save-btn');if(_gsb)_gsb.addEventListener('click',submitGoal);
-  const _tsb=document.getElementById('transfer-save-btn');if(_tsb)_tsb.addEventListener('click',submitTransfer);
+  document.getElementById('goal-save-btn').addEventListener('click',submitGoal);
+  document.getElementById('transfer-save-btn').addEventListener('click',submitTransfer);
   // Theme & scale
   document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.theme)));
   document.querySelectorAll('.scale-btn').forEach(b=>b.addEventListener('click',()=>applyScale(b.dataset.scale)));
