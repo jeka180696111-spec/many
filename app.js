@@ -193,9 +193,9 @@ function loadPageData(page){
   else if(page==='reserve'){if(state.reserve)renderReserve(state.reserve);}
   else if(page==='goals')renderGoals(getGoals());
   else if(page==='settings')renderSettingsUI();
-  // Потім підтягуємо з сервера
+  // Тягнемо з сервера
   if(!state.scriptUrl){renderDemoData(page);return;}
-  if(page==='dashboard')fetchDashboard();
+  if(page==='dashboard')fetchDashboard().then(()=>fetchOperations());
   else if(page==='operations')fetchOperations();
   else if(page==='analytics')fetchDashboard().then(()=>renderAnalytics());
   else if(page==='reserve')fetchReserve();
@@ -214,10 +214,10 @@ async function apiPost(body){
   const r=await fetch(state.scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:state.token})});
   if(!r.ok)throw new Error('API '+r.status);return r.json();
 }
-async function fetchDashboard(){try{const d=await apiGet('dashboard');if(d){state.dashboard=d;renderDashboard(d);renderMemberColumns();}}catch(e){console.error(e);renderDemoData('dashboard');}}
-async function fetchTransfers(){try{const d=await apiGet('transfers');if(d){state.transfers=d.transfers||[];}}catch(e){console.warn('transfers:',e);}}
-async function fetchOperations(){try{const d=await apiGet('operations',{month:fmtMonth(state.currentMonth)});if(d){state.operations=d.operations||[];renderOperations();renderCalendar();}}catch(e){console.error(e);}}
-async function fetchReserve(){try{const d=await apiGet('reserve');if(d){state.reserve=d;renderReserve(d);}}catch(e){console.error(e);renderDemoData('reserve');}}
+async function fetchDashboard(){try{const d=await apiGet('dashboard');if(d&&!d.error){state.dashboard=d;renderDashboard(d);renderMemberColumns();}}catch(e){console.warn('fetchDashboard:',e);}}
+async function fetchTransfers(){try{const d=await apiGet('transfers');if(d){state.transfers=d.transfers||[];}}catch(e){console.warn('fetchTransfers:',e);}}
+async function fetchOperations(){try{const d=await apiGet('operations',{month:fmtMonth(state.currentMonth)});if(d&&d.operations){state.operations=d.operations;renderOperations();renderCalendar();renderMemberColumns();}}catch(e){console.warn('fetchOperations:',e);}}
+async function fetchReserve(){try{const d=await apiGet('reserve');if(d&&!d.error){state.reserve=d;renderReserve(d);}}catch(e){console.warn('fetchReserve:',e);}}
 async function loadFx(){try{const d=state.scriptUrl?await apiGet('fx'):null;if(d){state.fx=d;setText('fx-usd',d.USD?.mid?.toFixed(2)+' ₴');setText('fx-eur',d.EUR?.mid?.toFixed(2)+' ₴');}}catch(e){}}
 
 // ── RENDER DASHBOARD ─────────────────────────────────────────────
@@ -322,14 +322,18 @@ function openAccountDetail(accountId,member){
 function renderRecentOps(ops){
   const el=document.getElementById('recent-list');
   if(!ops.length){el.innerHTML='<div style="padding:16px;text-align:center;color:var(--c-text-3);font-size:13px">Операцій немає</div>';return;}
-  el.innerHTML=ops.slice(0,6).map(txItem).join('');
+  el.innerHTML=ops.slice(0,6).map((op,i)=>txItem(op,true,state.operations.indexOf(op))).join('');
+  el.querySelectorAll('.tx-edit-btn').forEach(btn=>{btn.addEventListener('click',()=>openEditModal(btn.dataset.row));});
 }
-function txItem(op,editable=false){
+function txItem(op,editable=false,opIdx){
   const cat=getCat(op.category);const plus=op.type==="Дохід";
-  const cards=getCards();const cardObj=cards.find(c=>c.id===op.card);
-  const cardBadge=cardObj?`<span style="display:inline-flex;align-items:center;gap:3px;background:${cardObj.bg};color:${cardObj.color};border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;"><i class="ti ${cardObj.icon}"></i>${esc(cardObj.id)}</span>`:'';
-  const editBtn=editable?`<button class="tx-edit-btn" data-row="${op.row||''}"><i class="ti ti-edit"></i></button>`:'';
-  return `<div class="tx-item"><div class="tx-icon" style="background:${cat.bg}"><i class="ti ${cat.icon}" style="color:${cat.color}"></i></div><div class="tx-info"><div class="tx-name">${esc(op.desc||op.category)}</div><div class="tx-meta">${esc(op.category)} · ${esc(op.who||'')} · ${fmtDate(op.date)} ${cardBadge}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="tx-amount ${plus?'plus':'minus'}">${plus?'+':'−'}${fmtMoney(op.amount,op.currency)}</div>${editBtn}</div></div>`;
+  const whoCards=getCards(op.who);const cardObj=whoCards.find(c=>c.id===op.card)||getCards().find(c=>c.id===op.card);
+  const cardBadge=cardObj?`<span style="display:inline-flex;align-items:center;gap:3px;background:${cardObj.bg};color:${cardObj.color};border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;white-space:nowrap;"><i class="ti ${cardObj.icon}"></i>${esc(cardObj.id)}</span>`:'';
+  // Використовуємо row якщо є, інакше індекс масиву (для локальних операцій)
+  const editId=op.row||opIdx;
+  const pendingBadge=op._local?'<span style="font-size:9px;background:#f59e0b22;color:#f59e0b;border-radius:3px;padding:1px 4px;margin-left:4px;">↑</span>':'';
+  const editBtn=editable?`<button class="tx-edit-btn" data-row="${editId}" style="opacity:${editId!==undefined?1:.4}"><i class="ti ti-edit"></i></button>`:'';
+  return `<div class="tx-item"><div class="tx-icon" style="background:${cat.bg}"><i class="ti ${cat.icon}" style="color:${cat.color}"></i></div><div class="tx-info"><div class="tx-name">${esc(op.desc||op.category)}${pendingBadge}</div><div class="tx-meta">${esc(op.category)} · ${esc(op.who||'')} · ${fmtDate(op.date)} ${cardBadge}</div></div><div style="display:flex;align-items:center;gap:8px;"><div class="tx-amount ${plus?'plus':'minus'}">${plus?'+':'−'}${fmtMoney(op.amount,op.currency)}</div>${editBtn}</div></div>`;
 }
 function renderCatBars(id,by,total){
   const el=document.getElementById(id);if(!el)return;
@@ -357,14 +361,24 @@ function renderOperations(){
   let ops=state.operations;
   if(state.filterActive!=="all")ops=ops.filter(o=>o.type===state.filterActive||o.budget===state.filterActive||o.card===state.filterActive);
   if(!ops.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--c-text-3)">Немає операцій</div>';return;}
-  el.innerHTML=ops.map(op=>txItem(op,true)).join('');
+  // Зберігаємо маппінг відфільтрованих ops → оригінальні індекси
+  const opsWithIdx=ops.map(op=>({op,idx:state.operations.indexOf(op)}));
+  el.innerHTML=opsWithIdx.map(({op,idx})=>txItem(op,true,idx)).join('');
   el.querySelectorAll('.tx-edit-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>openEditModal(btn.dataset.row));
+    btn.addEventListener('click',()=>{
+      const rowVal=btn.dataset.row;openEditModal(rowVal);
+    });
   });
 }
-function openEditModal(row){
-  const op=state.operations.find(o=>String(o.row)===String(row)||(!row&&o===state.operations[0]));
-  if(!op)return;
+function openEditModal(rowOrIdx){
+  // Шукаємо за row (збережені в Sheet) або за індексом (локальні)
+  let op=null;
+  const rowStr=String(rowOrIdx);
+  // 1. Шукаємо за row числом
+  if(rowOrIdx&&rowOrIdx!=='')op=state.operations.find(o=>o.row&&String(o.row)===rowStr);
+  // 2. Якщо не знайшли — шукаємо за індексом масиву (для локальних операцій)
+  if(!op){const idx=parseInt(rowOrIdx);if(!isNaN(idx)&&state.operations[idx])op=state.operations[idx];}
+  if(!op){showToast('Операцію не знайдено','error');return;}
   let old2=document.getElementById('edit-op-modal');if(old2)old2.remove();
   const whoMember=op.who||getMyMember();
   const cards=getCards(whoMember);
@@ -633,7 +647,8 @@ function renderCardsList(containerId,cards,member){
 function renderDemoData(page){
   if(page==='dashboard'){
     // Генеруємо демо операції по рахунках
-    if(!state.operations.length){state.operations=[{date:new Date().toISOString(),type:'Витрата',category:'Продукти',desc:'Сільпо',amount:680,currency:'UAH',amountUah:680,who:'Євген',card:'Моно чорна'},{date:new Date(Date.now()-86400000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:32000,currency:'UAH',amountUah:32000,who:'Євген',card:'Приват'},{date:new Date(Date.now()-86400000).toISOString(),type:'Витрата',category:'Транспорт',desc:'ОККО',amount:1200,currency:'UAH',amountUah:1200,who:'Марина',card:'Готівка'},{date:new Date(Date.now()-172800000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:18000,currency:'UAH',amountUah:18000,who:'Марина',card:'Приват'}];}
+    // Демо операції тільки якщо scriptUrl НЕ налаштований (офлайн режим)
+    if(!state.scriptUrl&&!state.operations.length){state.operations=[{date:new Date().toISOString(),type:'Витрата',category:'Продукти',desc:'Сільпо',amount:680,currency:'UAH',amountUah:680,who:'Євген',card:'Моно чорна',_demo:true},{date:new Date(Date.now()-86400000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:32000,currency:'UAH',amountUah:32000,who:'Євген',card:'Приват',_demo:true},{date:new Date(Date.now()-86400000).toISOString(),type:'Витрата',category:'Транспорт',desc:'ОККО',amount:1200,currency:'UAH',amountUah:1200,who:'Марина',card:'Готівка',_demo:true},{date:new Date(Date.now()-172800000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:18000,currency:'UAH',amountUah:18000,who:'Марина',card:'Приват',_demo:true}];}
     renderDashboard({
       totalIncome:58500,totalExpense:16940,balance:41560,savingsRate:71,
       budgets:{"Сімейний":{income:0,expense:7420,balance:-7420},"Євген":{income:40500,expense:8420,balance:32080},"Марина":{income:18000,expense:1100,balance:16900}},
@@ -748,17 +763,29 @@ async function submitOperation(){
     const whoName=state.modalMember||getMyMember();
     const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:whoName,date:dt,card:state.selectedCard,who:whoName};
     // Зберігаємо локально одразу — не залежить від API
-    const localOp={...body,date:dt,amountUah:amt,who:whoName};
+    const localOp={...body,date:dt,amountUah:amt,who:whoName,_local:true};
     state.operations.unshift(localOp);
     closeModal();showToast('✅ Збережено!');
     if(state.currentPage==='dashboard'){renderMemberColumns();renderRecentOps(state.operations);}
     else if(state.currentPage==='operations')renderOperations();
     else if(state.currentPage==='calendar')renderCalendar();
-    // Відправляємо на сервер або в чергу
+    // Відправляємо на сервер — отримуємо row і знімаємо _local
     if(state.scriptUrl){
       apiPost(body)
-        .then(res=>{if(res?.row){localOp.row=res.row;showSyncStatus('ok');}})
+        .then(res=>{
+          if(res?.row){
+            localOp.row=res.row;
+            delete localOp._local;
+            showSyncStatus('ok');
+            // Перемальовуємо щоб кнопка edit з'явилась (тепер є row)
+            if(state.currentPage==='operations')renderOperations();
+            else if(state.currentPage==='dashboard')renderRecentOps(state.operations);
+          }
+        })
         .catch(()=>{enqueue(body);showSyncStatus('pending');});
+    } else {
+      // Без scriptUrl — операція залишається локальною, редагування через індекс
+      localOp._localIdx=state.operations.indexOf(localOp);
     }
   }catch(e){console.error(e);showToast('Помилка: '+e.message,'error');}
   finally{btn.disabled=false;updateModalType();}
@@ -940,12 +967,15 @@ async function fullSync(silent=true){
       apiGet('operations',{month:fmtMonth(state.currentMonth)}).catch(()=>null),
       apiGet('settings').catch(()=>null),
     ]);
+    // Очищаємо демо-дані якщо прийшли реальні
+    if(ops?.operations) state.operations=state.operations.filter(o=>!o._demo);
 
     // Застосовуємо дані
     if(dash){ state.dashboard=dash; renderDashboard(dash); }
     if(ops && ops.operations){
-      // Мержимо: сервер правда, але зберігаємо локальні без row (ще не збережені)
-      const localPending=state.operations.filter(o=>!o.row);
+      // Сервер — єдине джерело правди для збережених операцій
+      // Локальні pending (без row) додаємо зверху
+      const localPending=state.operations.filter(o=>!o.row&&o._local);
       state.operations=[...localPending,...ops.operations];
       if(state.currentPage==='operations')renderOperations();
       if(state.currentPage==='calendar')renderCalendar();
