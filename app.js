@@ -1,7 +1,7 @@
 'use strict';
-const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina',PROFILES_KEY:'budget_profiles',LAST_SYNC_KEY:'budget_last_sync'};
+const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina',PROFILES_KEY:'budget_profiles',LAST_SYNC_KEY:'budget_last_sync',TRANSFERS_KEY:'budget_transfers'};
 const ICON_LIST=['ti-shopping-cart','ti-car','ti-home','ti-tools-kitchen-2','ti-heart','ti-shirt','ti-device-gamepad-2','ti-sofa','ti-baby-carriage','ti-dots','ti-briefcase','ti-coin','ti-plane','ti-book','ti-coffee','ti-paw','ti-phone','ti-gift','ti-bike','ti-pill','ti-school','ti-sport-billard','ti-music','ti-bus','ti-credit-card','ti-cash','ti-building-bank','ti-star','ti-pizza','ti-salad','ti-droplet','ti-bolt','ti-wifi','ti-device-laptop','ti-tools','ti-shirt-sport','ti-garden-cart','ti-vaccine','ti-receipt'];
-const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',modalMember:null,dashboard:null,reserve:null,operations:[],goals:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null};
+const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',modalMember:null,dashboard:null,reserve:null,operations:[],goals:[],transfers:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null,editingOp:null};
 const CURRENCIES=['UAH','USD','EUR'],CUR_SYMBOLS={UAH:'₴',USD:'$',EUR:'€'};
 const MONTH_UK=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const DEFAULT_EXP_CATS=[{id:'Продукти',icon:'ti-shopping-cart',bg:'#E1F5EE',color:'#085041'},{id:'Транспорт',icon:'ti-car',bg:'#FAECE7',color:'#712B13'},{id:'Комунальні',icon:'ti-home',bg:'#E6F1FB',color:'#0C447C'},{id:'Ресторани',icon:'ti-tools-kitchen-2',bg:'#FEF3E2',color:'#633806'},{id:"Здоров'я",icon:'ti-heart',bg:'#FBEAF0',color:'#72243E'},{id:'Одяг',icon:'ti-shirt',bg:'#EEEDFE',color:'#3C3489'},{id:'Розваги',icon:'ti-device-gamepad-2',bg:'#F0F4FF',color:'#2D4AB7'},{id:'Дім',icon:'ti-sofa',bg:'#E6F1FB',color:'#0C447C'},{id:'Дитячі',icon:'ti-baby-carriage',bg:'#FBEAF0',color:'#72243E'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
@@ -136,8 +136,11 @@ function showApp(){
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   updateUserUI();navigateTo('dashboard');loadFx();
-  // Синхронізуємо налаштування з таблиці відразу після логіну
-  setTimeout(()=>fetchSettingsFromSheet(),500);
+  setTimeout(()=>{
+    fetchSettingsFromSheet();
+    // Автоматично налаштовуємо листи при першому підключенні
+    if(state.scriptUrl)apiPost({action:'setup'}).then(r=>{if(r?.success)console.log('Setup:',r.message);}).catch(()=>{});
+  },800);
 }
 function hideSplash(){document.getElementById('splash').classList.add('hidden');}
 
@@ -200,7 +203,8 @@ async function apiPost(body){
   const r=await fetch(state.scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:state.token})});
   if(!r.ok)throw new Error('API '+r.status);return r.json();
 }
-async function fetchDashboard(){try{const d=await apiGet('dashboard',{month:fmtMonth(state.currentMonth)});if(d){state.dashboard=d;renderDashboard(d);}}catch(e){console.error(e);renderDemoData('dashboard');}}
+async function fetchDashboard(){try{const d=await apiGet('dashboard');if(d){state.dashboard=d;renderDashboard(d);renderMemberColumns();}}catch(e){console.error(e);renderDemoData('dashboard');}}
+async function fetchTransfers(){try{const d=await apiGet('transfers');if(d){state.transfers=d.transfers||[];}}catch(e){console.warn('transfers:',e);}}
 async function fetchOperations(){try{const d=await apiGet('operations',{month:fmtMonth(state.currentMonth)});if(d){state.operations=d.operations||[];renderOperations();renderCalendar();}}catch(e){console.error(e);}}
 async function fetchReserve(){try{const d=await apiGet('reserve');if(d){state.reserve=d;renderReserve(d);}}catch(e){console.error(e);renderDemoData('reserve');}}
 async function loadFx(){try{const d=state.scriptUrl?await apiGet('fx'):null;if(d){state.fx=d;setText('fx-usd',d.USD?.mid?.toFixed(2)+' ₴');setText('fx-eur',d.EUR?.mid?.toFixed(2)+' ₴');}}catch(e){}}
@@ -220,22 +224,29 @@ function renderDashboard(d){
 function renderMemberColumns(){
   const el=document.getElementById('members-columns');if(!el)return;
   const profiles=getProfiles();
+  const byMember=state.dashboard?.byMember||{};
   el.innerHTML=FAMILY_MEMBERS.map(member=>{
     const mc=MEMBER_COLORS[member]||{bg:'var(--c-bg-3)',cl:'var(--c-text)',initials:'??'};
-    const prof=profiles[member]||{name:member,avatar:null,cards:DEFAULT_CARDS};
+    const prof=profiles[member]||{name:member,avatar:null};
     const cards=getCards(member);
-    const balances=getAccountBalances(member);
-    const totalBal=Object.values(balances).reduce((s,v)=>s+v,0);
+    // Баланс по картках — з операцій і з dashboardbyMember
+    const memberData=byMember[member]||{income:0,expense:0,byCard:{}};
+    const totalBal=memberData.income-memberData.expense;
     const cardsHtml=cards.map(c=>{
-      const bal=balances[c.id]||0;
+      const cardData=memberData.byCard?.[c.id]||{income:0,expense:0};
+      const bal=cardData.income-cardData.expense;
+      // Локальний баланс з state.operations
+      const localBal=state.operations.filter(o=>o.who===member&&o.card===c.id).reduce((s,o)=>{if(o.type==='Дохід')return s+(o.amountUah||o.amount);if(o.type==='Витрата')return s-(o.amountUah||o.amount);return s;},0);
+      const displayBal=state.operations.length?localBal:bal;
       return `<div class="member-card-chip" data-member="${esc(member)}" data-account="${esc(c.id)}">
         <div class="mcc-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
         <div class="mcc-info">
           <div class="mcc-name">${esc(c.id)}</div>
-          <div class="mcc-bal ${bal>=0?'pos':'neg'}">${fmtMoney(Math.abs(bal),'UAH')}</div>
+          <div class="mcc-bal ${displayBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(displayBal),'UAH')}</div>
         </div>
       </div>`;
     }).join('');
+    const displayBal=state.operations.length?state.operations.filter(o=>o.who===member).reduce((s,o)=>{if(o.type==='Дохід')return s+(o.amountUah||o.amount);if(o.type==='Витрата')return s-(o.amountUah||o.amount);return s;},0):totalBal;
     const avatarHtml=prof.avatar
       ?`<img src="${prof.avatar}" class="member-col-av-img">`
       :`<div class="member-col-av" style="background:${mc.bg};color:${mc.cl}">${mc.initials}</div>`;
@@ -243,7 +254,7 @@ function renderMemberColumns(){
       <div class="member-col-head">
         <div class="member-col-av-wrap">${avatarHtml}</div>
         <div class="member-col-name">${esc(prof.name||member)}</div>
-        <div class="member-col-total ${totalBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(totalBal),'UAH')}</div>
+        <div class="member-col-total ${displayBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(displayBal),'UAH')}</div>
       </div>
       <div class="member-cards">${cardsHtml}</div>
     </div>`;
@@ -344,10 +355,12 @@ function openEditModal(row){
   const op=state.operations.find(o=>String(o.row)===String(row)||(!row&&o===state.operations[0]));
   if(!op)return;
   let old2=document.getElementById('edit-op-modal');if(old2)old2.remove();
-  const cards=getCards();
+  const whoMember=op.who||getMyMember();
+  const cards=getCards(whoMember);
   const cardOpts=cards.map(c=>`<option value="${esc(c.id)}" ${op.card===c.id?'selected':''}>${esc(c.id)}</option>`).join('');
   const cats=[...getExpCats(),...getIncCats()];
   const catOpts=cats.map(c=>`<option value="${esc(c.id)}" ${op.category===c.id?'selected':''}>${esc(c.id)}</option>`).join('');
+  const memberOpts=FAMILY_MEMBERS.map(m=>`<option value="${esc(m)}" ${op.who===m?'selected':''}>${esc(m)}</option>`).join('');
   const div=document.createElement('div');
   div.id='edit-op-modal';
   div.style.cssText='position:fixed;inset:0;z-index:500;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);';
@@ -363,6 +376,8 @@ function openEditModal(row){
       <input id="edit-amount" type="number" class="desc-input" value="${op.amount||''}" style="margin-bottom:0"></div>
     <div class="modal-row"><label class="modal-label">Категорія</label>
       <select id="edit-cat" class="desc-input" style="margin-bottom:0">${catOpts}</select></div>
+    <div class="modal-row"><label class="modal-label">Хто</label>
+      <select id="edit-who" class="desc-input" style="margin-bottom:0">${memberOpts}</select></div>
     <div class="modal-row"><label class="modal-label">Рахунок</label>
       <select id="edit-card" class="desc-input" style="margin-bottom:0">${cardOpts}</select></div>
     <div class="modal-row"><label class="modal-label">Опис</label>
@@ -377,11 +392,11 @@ function openEditModal(row){
   div.querySelector('#edit-save-btn').addEventListener('click',async()=>{
     const newAmt=parseFloat(div.querySelector('#edit-amount').value);
     if(!newAmt||newAmt<=0){showToast('Вкажи суму','error');return;}
-    const body={action:'updateOperation',row:op.row,type:div.querySelector('#edit-type').value,amount:newAmt,category:div.querySelector('#edit-cat').value,card:div.querySelector('#edit-card').value,desc:div.querySelector('#edit-desc').value,currency:op.currency||'UAH'};
+    const newWho=div.querySelector('#edit-who')?.value||op.who;const body={action:'updateOperation',row:op.row,type:div.querySelector('#edit-type').value,amount:newAmt,category:div.querySelector('#edit-cat').value,card:div.querySelector('#edit-card').value,desc:div.querySelector('#edit-desc').value,currency:op.currency||'UAH',who:newWho,budget:newWho};
     try{
       if(state.scriptUrl)await apiPost(body);
       // Update local
-      Object.assign(op,{type:body.type,amount:newAmt,amountUah:newAmt,category:body.category,card:body.card,desc:body.desc});
+      Object.assign(op,{type:body.type,amount:newAmt,amountUah:newAmt,category:body.category,card:body.card,desc:body.desc,who:body.who,budget:body.budget});
       div.remove();renderOperations();renderAccountChips();showToast('✅ Збережено!');
     }catch(e){showToast('Помилка','error');}
   });
@@ -521,24 +536,60 @@ function renderSettingsUI(){
   const ss=document.getElementById('sync-status');
   if(ss){
     const lastSync=localStorage.getItem(APP_CONFIG.LAST_SYNC_KEY);
-    const syncStr=lastSync?'● Синхронізовано '+fmtDate(lastSync):'○ Не підключено';
-    ss.textContent=state.scriptUrl?syncStr:'○ Не налаштовано';
+    ss.textContent=state.scriptUrl?(lastSync?'● Синхронізовано '+new Date(lastSync).toLocaleTimeString('uk-UA'):'● Підключено'):'○ Не підключено';
     ss.style.color=state.scriptUrl?'var(--c-green)':'var(--c-red)';
   }
   renderCatsList('expense-cats-list',getExpCats(),false);
   renderCatsList('income-cats-list',getIncCats(),true);
-  // Картки по членах
-  renderCardsList('cards-evgen-list',getCards('Євген'),'Євген');
-  renderCardsList('cards-marina-list',getCards('Марина'),'Марина');
-  // Профіль поточного юзера
-  const member=getMyMember();
+  // Профілі членів + їх картки
+  renderMemberProfileCard('evgen','Євген');
+  renderMemberProfileCard('marina','Марина');
+}
+function renderMemberProfileCard(elemId, member){
+  const el=document.getElementById('member-profile-'+elemId);if(!el)return;
   const profs=getProfiles();
-  const myProf=profs[member]||{};
-  const ni=document.getElementById('settings-name-input');
-  if(ni&&myProf.name)ni.value=myProf.name;
-  const lastSyncEl=document.getElementById('last-sync-time');
-  const ls=localStorage.getItem(APP_CONFIG.LAST_SYNC_KEY);
-  if(lastSyncEl)lastSyncEl.textContent=ls?'Остання синх: '+new Date(ls).toLocaleTimeString('uk-UA'):'';
+  const prof=profs[member]||{name:member,avatar:null};
+  const mc=MEMBER_COLORS[member]||{bg:'var(--c-bg-3)',cl:'var(--c-text)',initials:'??'};
+  const cards=getCards(member);
+  const isAdmin=(state.user?.role==='admin'||getMyMember()===member);
+  const avatarHtml=prof.avatar?`<img src="${prof.avatar}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;">`:`<div style="width:44px;height:44px;border-radius:50%;background:${mc.bg};color:${mc.cl};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;">${mc.initials}</div>`;
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div style="cursor:pointer;" id="av-click-${elemId}">${avatarHtml}</div>
+      <div style="flex:1">
+        <input class="settings-name-input" id="profile-name-${elemId}" value="${esc(prof.name||member)}" placeholder="Ім'я" style="font-size:15px;font-weight:700;width:100%;${!isAdmin?'opacity:.5;pointer-events:none;':''}">
+        <div style="font-size:11px;color:var(--c-text-3);margin-top:3px;">Ім'я гаманця = ім'я профілю</div>
+      </div>
+      ${isAdmin?`<button class="btn-ghost-sm" id="save-profile-${elemId}" style="white-space:nowrap"><i class="ti ti-check"></i></button>`:''}
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--c-text-3);margin-bottom:8px;">Рахунки</div>
+    <div class="cat-accordion" id="cards-${elemId}-list"></div>
+    ${isAdmin?`<div class="settings-row-item" style="margin-top:8px;"><input class="settings-name-input flex1" id="new-card-${elemId}" placeholder="Назва рахунку"><button class="btn-ghost-sm" id="add-card-${elemId}"><i class="ti ti-plus"></i> Іконка</button></div>`:''}
+  `;
+  renderCardsList('cards-'+elemId+'-list', cards, member);
+
+  // Events
+  const saveBtn=el.querySelector('#save-profile-'+elemId);
+  if(saveBtn) saveBtn.addEventListener('click',()=>{
+    const newName=el.querySelector('#profile-name-'+elemId).value.trim();if(!newName)return;
+    const profs2=getProfiles();profs2[member]=profs2[member]||{};profs2[member].name=newName;
+    saveProfiles(profs2);
+    // Оновлюємо FAMILY_MEMBERS display name і картку гаманця
+    document.querySelectorAll('.member-col-name').forEach(e=>{if(e.dataset.member===member)e.textContent=newName;});
+    renderMemberColumns();showToast('✅ Збережено!');
+  });
+
+  const avBtn=el.querySelector('#av-click-'+elemId);
+  if(avBtn&&isAdmin) avBtn.addEventListener('click',()=>{
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+    inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const url=ev.target.result;const profs2=getProfiles();profs2[member]=profs2[member]||{};profs2[member].avatar=url;saveProfiles(profs2);if(member===getMyMember()){localStorage.setItem(APP_CONFIG.AVATAR_KEY,url);applyAvatar(url);}renderMemberProfileCard(elemId,member);renderMemberColumns();showToast('✅ Аватар!');};r.readAsDataURL(f);};
+    inp.click();
+  });
+
+  const addBtn=el.querySelector('#add-card-'+elemId);
+  if(addBtn) addBtn.addEventListener('click',()=>{
+    const mode=elemId==='evgen'?'card-evgen':'card-marina';openIconPicker(mode);
+  });
 }
 function renderCatsList(containerId,cats,isIncome){
   const el=document.getElementById(containerId);if(!el)return;
@@ -749,27 +800,82 @@ function submitGoal(){
 }
 
 // Transfer modal
-function openTransferModal(fromIdx){
+// ── ПОВНОЦІННИЙ ПЕРЕКАЗ ──────────────────────────────────────────
+function openTransferModal(context){
+  // context може бути {fromMember, fromCard} або просто індекс цілі
+  let old2=document.getElementById('transfer-full-modal');if(old2)old2.remove();
+
+  const members=FAMILY_MEMBERS;
   const goals=getGoals();
-  const fromSel=document.getElementById('transfer-from');
-  const toSel=document.getElementById('transfer-to');
-  fromSel.innerHTML=goals.map((g,i)=>'<option value="'+i+'"'+(i===fromIdx?' selected':'')+'>'+esc(g.name)+' ('+fmtMoney(g.saved,'UAH')+')</option>').join('');
-  toSel.innerHTML=goals.map((g,i)=>'<option value="'+i+'"'+(i!==(fromIdx)&&i===0?' selected':'')+'>'+esc(g.name)+'</option>').join('');
-  document.getElementById('transfer-amount').value='';
-  document.getElementById('modal-overlay').classList.remove('hidden');
-  document.getElementById('modal-transfer').classList.remove('hidden');
+  const profiles=getProfiles();
+
+  // Типи об'єктів
+  const accountOpts=members.flatMap(m=>{
+    const prof=profiles[m]||{name:m};
+    return getCards(m).map(c=>`<option value="member:${esc(m)}:${esc(c.id)}">${esc(prof.name||m)} → ${esc(c.id)}</option>`);
+  });
+  const reserveOpt='<option value="reserve:">🛡️ Резерв</option>';
+  const goalsOpts=goals.map((g,i)=>`<option value="goal:${i}">🎯 ${esc(g.name)}</option>`);
+  const allOpts=[...accountOpts,reserveOpt,...goalsOpts].join('');
+
+  const div=document.createElement('div');
+  div.id='transfer-full-modal';
+  div.style.cssText='position:fixed;inset:0;z-index:600;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);';
+  div.innerHTML=`<div style="background:var(--c-card);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;">
+    <div style="width:40px;height:4px;background:var(--c-border);border-radius:2px;margin:0 auto 16px;"></div>
+    <div style="font-size:17px;font-weight:700;margin-bottom:16px;">🔄 Переказ</div>
+    <div class="modal-row"><label class="modal-label">Звідки</label>
+      <select id="trf-from" class="desc-input" style="margin-bottom:0">${allOpts}</select></div>
+    <div class="modal-row"><label class="modal-label">Куди</label>
+      <select id="trf-to" class="desc-input" style="margin-bottom:0">${allOpts}</select></div>
+    <div class="modal-row"><label class="modal-label">Сума</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="trf-amount" type="number" class="desc-input" placeholder="0" style="flex:1;margin-bottom:0">
+        <button id="trf-currency-btn" style="padding:10px 14px;border-radius:10px;background:var(--c-bg-3);color:var(--c-text);font-weight:700;white-space:nowrap;">UAH</button>
+      </div></div>
+    <div class="modal-row"><label class="modal-label">Коментар</label>
+      <input id="trf-desc" type="text" class="desc-input" placeholder="Опис переказу" style="margin-bottom:0"></div>
+    <button id="trf-save-btn" style="width:100%;padding:14px;border-radius:14px;background:var(--c-accent);color:#fff;font-size:15px;font-weight:700;margin-top:6px;">Переказати</button>
+  </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click',e=>{if(e.target===div)div.remove();});
+
+  let trfCurrency='UAH';
+  div.querySelector('#trf-currency-btn').addEventListener('click',()=>{
+    const curs=['UAH','USD','EUR'];const i=curs.indexOf(trfCurrency);trfCurrency=curs[(i+1)%curs.length];div.querySelector('#trf-currency-btn').textContent=trfCurrency;
+  });
+
+  div.querySelector('#trf-save-btn').addEventListener('click',async()=>{
+    const amt=parseFloat(div.querySelector('#trf-amount').value);
+    if(!amt||amt<=0){showToast('Вкажи суму','error');return;}
+    const fromVal=div.querySelector('#trf-from').value;
+    const toVal=div.querySelector('#trf-to').value;
+    if(fromVal===toVal){showToast('Оберіть різні рахунки','error');return;}
+
+    const parseTarget=v=>{const[type,...rest]=v.split(':');return{type,id:rest[0]||'',card:rest[1]||''};};
+    const from=parseTarget(fromVal);const to=parseTarget(toVal);
+    const body={action:'addTransfer',amount:amt,currency:trfCurrency,desc:div.querySelector('#trf-desc').value||'',date:new Date().toISOString()};
+
+    if(from.type==='member'){body.fromWho=from.id;body.fromCard=from.card;}
+    if(from.type==='reserve'){body.fromReserve=true;}
+    if(from.type==='goal'){/* goal logic local */}
+    if(to.type==='member'){body.toWho=to.id;body.toCard=to.card;}
+    if(to.type==='reserve'){body.toReserve=true;}
+
+    // Локально
+    if(from.type==='member'){state.operations.unshift({type:'Витрата',category:'Переказ',desc:`→ ${to.type==='member'?to.id+' '+to.card:'Резерв'}`,amount:amt,amountUah:amt,currency:trfCurrency,who:from.id,card:from.card,date:new Date().toISOString()});}
+    if(to.type==='member'){state.operations.unshift({type:'Дохід',category:'Переказ',desc:`← ${from.type==='member'?from.id+' '+from.card:'Резерв'}`,amount:amt,amountUah:amt,currency:trfCurrency,who:to.id,card:to.card,date:new Date().toISOString()});}
+    // Ціль → ціль
+    if(from.type==='goal'&&to.type==='goal'){
+      const g=getGoals();const fi=parseInt(from.id);const ti=parseInt(to.id);
+      if(g[fi]&&g[ti]){g[fi].saved-=amt;g[ti].saved+=amt;saveGoals(g);renderGoals(g);}
+    }
+
+    div.remove();renderMemberColumns();showToast('✅ Переказ записано!');
+    if(state.scriptUrl){apiPost(body).catch(e=>console.warn('Transfer sync:',e));}
+  });
 }
-function submitTransfer(){
-  const amt=parseFloat(document.getElementById('transfer-amount').value);
-  const fi=parseInt(document.getElementById('transfer-from').value);
-  const ti=parseInt(document.getElementById('transfer-to').value);
-  if(!amt||amt<=0){showToast('Вкажи суму','error');return;}
-  if(fi===ti){showToast('Оберіть різні цілі','error');return;}
-  const g=getGoals();
-  if(g[fi].saved<amt){showToast('Недостатньо коштів','error');return;}
-  g[fi].saved-=amt;g[ti].saved+=amt;
-  saveGoals(g);closeModal();renderGoals(g);showToast('✅ Переказано!');
-}
+function submitTransfer(){openTransferModal();}
 
 // ── MONTH/CALENDAR NAV ────────────────────────────────────────────
 function updateMonthLabel(){
@@ -887,6 +993,31 @@ function openIconPicker(mode){
   });
 }
 
+// ── FAB MENU ─────────────────────────────────────────────────────
+function openFabMenu(){
+  let old2=document.getElementById('fab-menu');if(old2){old2.remove();return;}
+  const div=document.createElement('div');
+  div.id='fab-menu';
+  div.style.cssText='position:fixed;bottom:90px;right:16px;z-index:400;display:flex;flex-direction:column;gap:10px;align-items:flex-end;';
+  const items=[
+    {icon:'ti-plus',label:'Витрата / Дохід',bg:'var(--c-accent)',action:()=>{div.remove();openModal();}},
+    {icon:'ti-arrows-exchange',label:'Переказ',bg:'var(--c-blue)',action:()=>{div.remove();openTransferModal();}},
+    {icon:'ti-shield',label:'Резерв',bg:'#27500A',action:()=>{div.remove();openReserveModal();}},
+    {icon:'ti-target',label:'Ціль',bg:'var(--c-pink)',action:()=>{div.remove();openGoalModal();}},
+  ];
+  div.innerHTML=items.map((it,i)=>`
+    <div class="fab-menu-item" data-idx="${i}" style="display:flex;align-items:center;gap:10px;animation:slideUp .2s ${i*0.05}s both;">
+      <span style="background:var(--c-card);border:.5px solid var(--c-border);padding:6px 12px;border-radius:20px;font-size:13px;font-weight:600;color:var(--c-text);white-space:nowrap;box-shadow:var(--shadow);">${it.label}</span>
+      <div style="width:44px;height:44px;border-radius:50%;background:${it.bg};display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.25);cursor:pointer;"><i class="ti ${it.icon}" style="color:#fff;font-size:20px;"></i></div>
+    </div>`).join('');
+  document.body.appendChild(div);
+
+  items.forEach((it,i)=>{div.querySelectorAll('.fab-menu-item')[i].addEventListener('click',it.action);});
+
+  // Клік поза меню — закрити
+  setTimeout(()=>document.addEventListener('click',function closeFab(e){if(!div.contains(e.target)&&e.target.id!=='fab'){div.remove();document.removeEventListener('click',closeFab);}},true),100);
+}
+
 // ── SIDEBAR ───────────────────────────────────────────────────────
 function openSidebar(){document.getElementById('sidebar').classList.add('open');let ov=document.getElementById('sb-ov');if(!ov){ov=document.createElement('div');ov.id='sb-ov';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;';ov.onclick=closeSidebar;document.body.appendChild(ov);}ov.style.display='block';}
 function closeSidebar(){document.getElementById('sidebar').classList.remove('open');const ov=document.getElementById('sb-ov');if(ov)ov.style.display='none';}
@@ -907,7 +1038,7 @@ function bindEvents(){
   document.getElementById('cal-prev').addEventListener('click',()=>{state.calMonth=new Date(state.calMonth.getFullYear(),state.calMonth.getMonth()-1,1);renderCalendar();});
   document.getElementById('cal-next').addEventListener('click',()=>{state.calMonth=new Date(state.calMonth.getFullYear(),state.calMonth.getMonth()+1,1);renderCalendar();});
   // FAB & add buttons
-  document.getElementById('fab').addEventListener('click',()=>openModal());
+  document.getElementById('fab').addEventListener('click',openFabMenu);
   document.getElementById('add-btn-dash').addEventListener('click',()=>openModal());
   const aob=document.getElementById('add-btn-ops');if(aob)aob.addEventListener('click',()=>openModal());
   document.getElementById('add-reserve-btn').addEventListener('click',openReserveModal);
