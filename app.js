@@ -1,37 +1,66 @@
 'use strict';
-const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina'};
+const APP_CONFIG={GOOGLE_CLIENT_ID:'650414957833-s37phqum36bfomv5sr5n2cm4tau55ng5.apps.googleusercontent.com',SCRIPT_URL_KEY:'budget_script_url',TOKEN_KEY:'budget_google_token',USER_KEY:'budget_user',THEME_KEY:'budget_theme',FONT_KEY:'budget_font',AVATAR_KEY:'budget_avatar',USERNAME_KEY:'budget_username',FAMILY_KEY:'budget_family',GOALS_KEY:'budget_goals',EXP_CATS_KEY:'budget_exp_cats',INC_CATS_KEY:'budget_inc_cats',CARDS_KEY:'budget_cards',MONO_EVGEN_KEY:'budget_mono_evgen',MONO_MARINA_KEY:'budget_mono_marina',PROFILES_KEY:'budget_profiles',LAST_SYNC_KEY:'budget_last_sync'};
 const ICON_LIST=['ti-shopping-cart','ti-car','ti-home','ti-tools-kitchen-2','ti-heart','ti-shirt','ti-device-gamepad-2','ti-sofa','ti-baby-carriage','ti-dots','ti-briefcase','ti-coin','ti-plane','ti-book','ti-coffee','ti-paw','ti-phone','ti-gift','ti-bike','ti-pill','ti-school','ti-sport-billard','ti-music','ti-bus','ti-credit-card','ti-cash','ti-building-bank','ti-star','ti-pizza','ti-salad','ti-droplet','ti-bolt','ti-wifi','ti-device-laptop','ti-tools','ti-shirt-sport','ti-garden-cart','ti-vaccine','ti-receipt'];
-const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',dashboard:null,reserve:null,operations:[],goals:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null};
+const state={user:null,token:null,scriptUrl:'',currentPage:'dashboard',currentMonth:new Date(),calMonth:new Date(),currentType:'Витрата',currentCurrency:'UAH',reserveType:'Поповнення',reserveCurrency:'UAH',selectedCat:'',selectedCard:'',modalMember:null,dashboard:null,reserve:null,operations:[],goals:[],fx:null,filterActive:'all',editingGoalIdx:-1,activeAccountId:null};
 const CURRENCIES=['UAH','USD','EUR'],CUR_SYMBOLS={UAH:'₴',USD:'$',EUR:'€'};
 const MONTH_UK=['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 const DEFAULT_EXP_CATS=[{id:'Продукти',icon:'ti-shopping-cart',bg:'#E1F5EE',color:'#085041'},{id:'Транспорт',icon:'ti-car',bg:'#FAECE7',color:'#712B13'},{id:'Комунальні',icon:'ti-home',bg:'#E6F1FB',color:'#0C447C'},{id:'Ресторани',icon:'ti-tools-kitchen-2',bg:'#FEF3E2',color:'#633806'},{id:"Здоров'я",icon:'ti-heart',bg:'#FBEAF0',color:'#72243E'},{id:'Одяг',icon:'ti-shirt',bg:'#EEEDFE',color:'#3C3489'},{id:'Розваги',icon:'ti-device-gamepad-2',bg:'#F0F4FF',color:'#2D4AB7'},{id:'Дім',icon:'ti-sofa',bg:'#E6F1FB',color:'#0C447C'},{id:'Дитячі',icon:'ti-baby-carriage',bg:'#FBEAF0',color:'#72243E'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
 const DEFAULT_INC_CATS=[{id:'Зарплата',icon:'ti-briefcase',bg:'#EAF3DE',color:'#27500A'},{id:'Підробіток',icon:'ti-coin',bg:'#FEF3E2',color:'#633806'},{id:'Інше',icon:'ti-dots',bg:'#F0F0F0',color:'#555'}];
 const DEFAULT_CARDS=[{id:'Готівка',icon:'ti-cash',bg:'#EAF3DE',color:'#27500A'},{id:'Моно чорна',icon:'ti-credit-card',bg:'#1a1a2e',color:'#fff'},{id:'ПУМБ',icon:'ti-credit-card',bg:'#E6F1FB',color:'#0C447C'},{id:'Приват',icon:'ti-credit-card',bg:'#FBEAF0',color:'#72243E'},{id:'Кредитна',icon:'ti-credit-card',bg:'#FAEEDA',color:'#633806'}];
+// Два члени сім'ї — константа для дашборду і операцій
+const FAMILY_MEMBERS=['Євген','Марина'];
+// Кольори членів
+const MEMBER_COLORS={Євген:{bg:'var(--c-blue-soft)',cl:'var(--c-blue)',initials:'ЄК'},Марина:{bg:'var(--c-pink-soft)',cl:'var(--c-pink)',initials:'МК'}};
 // ── HELPERS ──────────────────────────────────────────────────────
 function getExpCats(){try{const s=localStorage.getItem(APP_CONFIG.EXP_CATS_KEY);return s?JSON.parse(s):DEFAULT_EXP_CATS;}catch{return DEFAULT_EXP_CATS;}}
 function getIncCats(){try{const s=localStorage.getItem(APP_CONFIG.INC_CATS_KEY);return s?JSON.parse(s):DEFAULT_INC_CATS;}catch{return DEFAULT_INC_CATS;}}
-function getCards(){try{const s=localStorage.getItem(APP_CONFIG.CARDS_KEY);return s?JSON.parse(s):DEFAULT_CARDS;}catch{return DEFAULT_CARDS;}}
-function saveCards(c){localStorage.setItem(APP_CONFIG.CARDS_KEY,JSON.stringify(c));syncSettingsToSheet();}
+// Картки по члену: getCards('Євген') або getCards() → спільні
+function getCards(member){
+  const key=member?APP_CONFIG.CARDS_KEY+'_'+member:APP_CONFIG.CARDS_KEY;
+  try{const s=localStorage.getItem(key);return s?JSON.parse(s):DEFAULT_CARDS;}catch{return DEFAULT_CARDS;}
+}
+function saveCards(c,member){
+  const key=member?APP_CONFIG.CARDS_KEY+'_'+member:APP_CONFIG.CARDS_KEY;
+  localStorage.setItem(key,JSON.stringify(c));
+  syncSettingsToSheet();
+}
+// Профілі юзерів (ім'я, аватар, картки) — зберігаємо/читаємо з Sheet
+function getProfiles(){try{const s=localStorage.getItem(APP_CONFIG.PROFILES_KEY);return s?JSON.parse(s):{Євген:{name:'Євген',avatar:null,cards:DEFAULT_CARDS},Марина:{name:'Марина',avatar:null,cards:DEFAULT_CARDS}};}catch{return {};}}
+function saveProfiles(p){localStorage.setItem(APP_CONFIG.PROFILES_KEY,JSON.stringify(p));syncSettingsToSheet();}
+// Отримати профіль поточного юзера за email
+function getMyMember(){
+  const email=(state.user?.email||'').toLowerCase();
+  if(email.includes('yevhen')||email.includes('evgen')||email.includes('євген'))return'Євген';
+  if(email.includes('marina')||email.includes('марина'))return'Марина';
+  // Fallback — по імені
+  const name=localStorage.getItem(APP_CONFIG.USERNAME_KEY)||state.user?.name||'';
+  if(name.toLowerCase().includes('марина')||name.toLowerCase().includes('marina'))return'Марина';
+  return'Євген';
+}
 
 // ── ACCOUNTS BALANCE ─────────────────────────────────────────────
-// Рахує баланс кожного рахунку з state.operations
-function getAccountBalances(){
-  const cards=getCards();
+// Рахує баланс кожного рахунку (опційно фільтр по члену)
+function getAccountBalances(member){
+  const cards=member?getCards(member):getCards();
   const balances={};
   cards.forEach(c=>{ balances[c.id]=0; });
   state.operations.forEach(op=>{
     const card=op.card||'';
     if(!card)return;
+    if(member&&op.who!==member)return; // фільтр по члену
     if(!(card in balances))balances[card]=0;
     if(op.type==='Дохід') balances[card]+=(op.amountUah||op.amount||0);
     else if(op.type==='Витрата') balances[card]-=(op.amountUah||op.amount||0);
   });
   return balances;
 }
-// Загальний баланс по всіх рахунках
-function getTotalBalance(){
-  const b=getAccountBalances();
+// Баланс конкретного члена (сума всіх його карток)
+function getMemberBalance(member){
+  const b=getAccountBalances(member);
   return Object.values(b).reduce((s,v)=>s+v,0);
+}
+function getTotalBalance(){
+  return FAMILY_MEMBERS.reduce((s,m)=>s+getMemberBalance(m),0);
 }
 function getCat(id){return [...getExpCats(),...getIncCats()].find(c=>c.id===id)||{id,icon:'ti-dots',bg:'#F0F0F0',color:'#555'};}
 function getGoals(){try{const s=localStorage.getItem(APP_CONFIG.GOALS_KEY);return s?JSON.parse(s):[];}catch{return[];}}
@@ -48,9 +77,8 @@ window.addEventListener('DOMContentLoaded',()=>{loadSettings();initGoogleAuth();
 
 function loadSettings(){
   const theme=localStorage.getItem(APP_CONFIG.THEME_KEY)||'light';
-  const font=localStorage.getItem(APP_CONFIG.FONT_KEY)||'Manrope';
   state.scriptUrl=localStorage.getItem(APP_CONFIG.SCRIPT_URL_KEY)||'';
-  applyTheme(theme);applyFont(font);
+  applyTheme(theme);
   // Load family name
   const fam=localStorage.getItem(APP_CONFIG.FAMILY_KEY)||'Родина Коваль';
   const fi=document.getElementById('family-name-input');
@@ -108,6 +136,8 @@ function showApp(){
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   updateUserUI();navigateTo('dashboard');loadFx();
+  // Синхронізуємо налаштування з таблиці відразу після логіну
+  setTimeout(()=>fetchSettingsFromSheet(),500);
 }
 function hideSplash(){document.getElementById('splash').classList.add('hidden');}
 
@@ -181,11 +211,46 @@ function renderDashboard(d){
   setText('dash-expense',fmtMoney(d.totalExpense,'UAH'));
   setText('dash-balance',fmtMoney(d.balance,'UAH'));
   setText('dash-savings-rate','Накопичення '+(d.savingsRate||0).toFixed(0)+'%');
-  renderAccountChips();
+  renderMemberColumns();
   renderRecentOps(d.recent||[]);
   renderCatBars("cat-bars",d.byCategory||{},d.totalExpense);
   renderDailyChart(d.byDay||{});
   updateMonthLabel();
+}
+function renderMemberColumns(){
+  const el=document.getElementById('members-columns');if(!el)return;
+  const profiles=getProfiles();
+  el.innerHTML=FAMILY_MEMBERS.map(member=>{
+    const mc=MEMBER_COLORS[member]||{bg:'var(--c-bg-3)',cl:'var(--c-text)',initials:'??'};
+    const prof=profiles[member]||{name:member,avatar:null,cards:DEFAULT_CARDS};
+    const cards=getCards(member);
+    const balances=getAccountBalances(member);
+    const totalBal=Object.values(balances).reduce((s,v)=>s+v,0);
+    const cardsHtml=cards.map(c=>{
+      const bal=balances[c.id]||0;
+      return `<div class="member-card-chip" data-member="${esc(member)}" data-account="${esc(c.id)}">
+        <div class="mcc-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
+        <div class="mcc-info">
+          <div class="mcc-name">${esc(c.id)}</div>
+          <div class="mcc-bal ${bal>=0?'pos':'neg'}">${fmtMoney(Math.abs(bal),'UAH')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    const avatarHtml=prof.avatar
+      ?`<img src="${prof.avatar}" class="member-col-av-img">`
+      :`<div class="member-col-av" style="background:${mc.bg};color:${mc.cl}">${mc.initials}</div>`;
+    return `<div class="member-col">
+      <div class="member-col-head">
+        <div class="member-col-av-wrap">${avatarHtml}</div>
+        <div class="member-col-name">${esc(prof.name||member)}</div>
+        <div class="member-col-total ${totalBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(totalBal),'UAH')}</div>
+      </div>
+      <div class="member-cards">${cardsHtml}</div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.member-card-chip').forEach(ch=>{
+    ch.addEventListener('click',()=>openAccountDetail(ch.dataset.account,ch.dataset.member));
+  });
 }
 function renderAccountChips(){
   const el=document.getElementById('accounts-row');if(!el)return;
@@ -206,10 +271,11 @@ function renderAccountChips(){
     ch.addEventListener('click',()=>openAccountDetail(ch.dataset.account));
   });
 }
-function openAccountDetail(accountId){
-  const card=getCards().find(c=>c.id===accountId);
+function openAccountDetail(accountId,member){
+  const cards=member?getCards(member):getCards();
+  const card=cards.find(c=>c.id===accountId);
   if(!card)return;
-  const ops=state.operations.filter(o=>o.card===accountId);
+  const ops=state.operations.filter(o=>o.card===accountId&&(!member||o.who===member));
   const bal=getAccountBalances()[accountId]||0;
   let old=document.getElementById('account-detail-modal');if(old)old.remove();
   const div=document.createElement('div');
@@ -453,10 +519,26 @@ function renderSettingsUI(){
   const el=document.getElementById('script-url-preview');
   if(el) el.textContent=state.scriptUrl?state.scriptUrl.substring(0,50)+'…':'Не налаштовано';
   const ss=document.getElementById('sync-status');
-  if(ss){ss.textContent=state.scriptUrl?'● Підключено':'○ Не підключено';ss.style.color=state.scriptUrl?'var(--c-green)':'var(--c-red)';}
+  if(ss){
+    const lastSync=localStorage.getItem(APP_CONFIG.LAST_SYNC_KEY);
+    const syncStr=lastSync?'● Синхронізовано '+fmtDate(lastSync):'○ Не підключено';
+    ss.textContent=state.scriptUrl?syncStr:'○ Не налаштовано';
+    ss.style.color=state.scriptUrl?'var(--c-green)':'var(--c-red)';
+  }
   renderCatsList('expense-cats-list',getExpCats(),false);
   renderCatsList('income-cats-list',getIncCats(),true);
-  renderCardsList('cards-list',getCards());
+  // Картки по членах
+  renderCardsList('cards-evgen-list',getCards('Євген'),'Євген');
+  renderCardsList('cards-marina-list',getCards('Марина'),'Марина');
+  // Профіль поточного юзера
+  const member=getMyMember();
+  const profs=getProfiles();
+  const myProf=profs[member]||{};
+  const ni=document.getElementById('settings-name-input');
+  if(ni&&myProf.name)ni.value=myProf.name;
+  const lastSyncEl=document.getElementById('last-sync-time');
+  const ls=localStorage.getItem(APP_CONFIG.LAST_SYNC_KEY);
+  if(lastSyncEl)lastSyncEl.textContent=ls?'Остання синх: '+new Date(ls).toLocaleTimeString('uk-UA'):'';
 }
 function renderCatsList(containerId,cats,isIncome){
   const el=document.getElementById(containerId);if(!el)return;
@@ -473,13 +555,14 @@ function renderCatsList(containerId,cats,isIncome){
     });
   });
 }
-function renderCardsList(containerId,cards){
+function renderCardsList(containerId,cards,member){
   const el=document.getElementById(containerId);if(!el)return;
-  el.innerHTML=cards.map((c,i)=>`<div class="cat-accordion-item"><div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div><div class="cat-accordion-name">${esc(c.id)}</div><button class="cat-del-btn" data-idx="${i}"><i class="ti ti-x"></i></button></div>`).join('');
+  el.innerHTML=cards.map((c,i)=>`<div class="cat-accordion-item"><div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div><div class="cat-accordion-name">${esc(c.id)}</div><button class="cat-del-btn" data-idx="${i}" data-member="${esc(member||'')}"><i class="ti ti-x"></i></button></div>`).join('');
   el.querySelectorAll('.cat-del-btn').forEach(b=>{
     b.addEventListener('click',()=>{
-      const list=getCards();list.splice(parseInt(b.dataset.idx),1);saveCards(list);
-      renderSettingsUI();showToast('Картку видалено');
+      const m=b.dataset.member||null;
+      const list=getCards(m);list.splice(parseInt(b.dataset.idx),1);saveCards(list,m);
+      renderSettingsUI();renderMemberColumns();showToast('Картку видалено');
     });
   });
 }
@@ -487,6 +570,8 @@ function renderCardsList(containerId,cards){
 // ── DEMO DATA ─────────────────────────────────────────────────────
 function renderDemoData(page){
   if(page==='dashboard'){
+    // Генеруємо демо операції по рахунках
+    if(!state.operations.length){state.operations=[{date:new Date().toISOString(),type:'Витрата',category:'Продукти',desc:'Сільпо',amount:680,currency:'UAH',amountUah:680,who:'Євген',card:'Моно чорна'},{date:new Date(Date.now()-86400000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:32000,currency:'UAH',amountUah:32000,who:'Євген',card:'Приват'},{date:new Date(Date.now()-86400000).toISOString(),type:'Витрата',category:'Транспорт',desc:'ОККО',amount:1200,currency:'UAH',amountUah:1200,who:'Марина',card:'Готівка'},{date:new Date(Date.now()-172800000).toISOString(),type:'Дохід',category:'Зарплата',desc:'Зарплата',amount:18000,currency:'UAH',amountUah:18000,who:'Марина',card:'Приват'}];}
     renderDashboard({
       totalIncome:58500,totalExpense:16940,balance:41560,savingsRate:71,
       budgets:{"Сімейний":{income:0,expense:7420,balance:-7420},"Євген":{income:40500,expense:8420,balance:32080},"Марина":{income:18000,expense:1100,balance:16900}},
@@ -533,7 +618,8 @@ function renderDemoData(page){
 // ── MODALS ────────────────────────────────────────────────────────
 function openModal(type){
   state.currentType=type||'Витрата';state.currentCurrency='UAH';state.selectedCat='';state.selectedCard='';
-  renderCatGrid();renderCardGrid();updateModalType();
+  state.modalMember=getMyMember(); // дефолт — поточний юзер
+  renderCatGrid();renderCardGrid();updateModalType();updateModalOwner();
   document.getElementById('amount-input').value='';
   document.getElementById('desc-input').value='';
   document.getElementById('currency-btn').innerHTML='UAH <i class="ti ti-chevron-down"></i>';
@@ -544,6 +630,15 @@ function openModal(type){
   document.getElementById('modal-overlay').classList.remove('hidden');
   document.getElementById('modal-add').classList.remove('hidden');
   setTimeout(()=>document.getElementById('amount-input').focus(),100);
+}
+function updateModalOwner(){
+  document.querySelectorAll('.owner-modal-btn').forEach(b=>{
+    const isActive=b.dataset.owner===state.modalMember;
+    b.style.background=isActive?'var(--c-blue-soft)':'var(--c-bg-3)';
+    b.style.color=isActive?'var(--c-blue)':'var(--c-text-2)';
+    b.style.borderColor=isActive?'var(--c-blue)':'transparent';
+  });
+  renderCardGrid(); // перемалюємо картки для нового члена
 }
 function closeModal(){
   document.getElementById('modal-overlay').classList.add('hidden');
@@ -568,7 +663,8 @@ function renderCatGrid(){
 }
 function renderCardGrid(){
   const el=document.getElementById('card-grid-modal');if(!el)return;
-  const cards=getCards();
+  const member=state.modalMember||getMyMember();
+  const cards=getCards(member);
   el.innerHTML=cards.map(c=>`<div class="cat-cell${state.selectedCard===c.id?' selected':''}" data-card="${esc(c.id)}" style="${state.selectedCard===c.id?'background:'+c.bg+';border-color:'+c.color+';':''}"><i class="ti ${c.icon}" style="color:${state.selectedCard===c.id?c.color:'var(--c-text-2)'}"></i><span>${esc(c.id)}</span></div>`).join('');
   el.querySelectorAll('[data-card]').forEach(el=>el.addEventListener('click',()=>{state.selectedCard=el.dataset.card;renderCardGrid();}));
 }
@@ -587,14 +683,20 @@ async function submitOperation(){
   const btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='Збереження...';
   try{
     if(!state.selectedCard){showToast('Вибери рахунок','error');btn.disabled=false;updateModalType();return;}
-    const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:'Сімейний',date:dt,card:state.selectedCard};
-    if(state.scriptUrl)await apiPost(body);
-    state.operations.unshift({...body,date:dt,amountUah:amt,who:localStorage.getItem(APP_CONFIG.USERNAME_KEY)||state.user?.name||'Я'});
+    const whoName=state.modalMember||getMyMember();
+    const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:whoName,date:dt,card:state.selectedCard,who:whoName};
+    // Зберігаємо локально одразу — не залежить від API
+    const localOp={...body,date:dt,amountUah:amt,who:whoName};
+    state.operations.unshift(localOp);
     closeModal();showToast('✅ Збережено!');
-    if(state.currentPage==='dashboard')fetchDashboard();
+    if(state.currentPage==='dashboard'){renderMemberColumns();renderRecentOps(state.operations);}
     else if(state.currentPage==='operations')renderOperations();
     else if(state.currentPage==='calendar')renderCalendar();
-  }catch(e){showToast('Помилка збереження','error');}
+    // Асинхронно шлемо на сервер
+    if(state.scriptUrl){
+      apiPost(body).then(res=>{if(res?.row)localOp.row=res.row;}).catch(e=>console.warn('Sync error:',e));
+    }
+  }catch(e){console.error(e);showToast('Помилка: '+e.message,'error');}
   finally{btn.disabled=false;updateModalType();}
 }
 
@@ -678,25 +780,59 @@ function prevMonth(){state.currentMonth=new Date(state.currentMonth.getFullYear(
 function nextMonth(){state.currentMonth=new Date(state.currentMonth.getFullYear(),state.currentMonth.getMonth()+1,1);updateMonthLabel();loadPageData(state.currentPage);}
 
 // ── THEME / SCALE ─────────────────────────────────────────────────
-function applyFont(f){
-  const fonts={'Manrope':'Manrope,sans-serif','Inter':'Inter,sans-serif','Nunito':'Nunito,sans-serif','Roboto':'Roboto,sans-serif'};
-  document.documentElement.style.setProperty('--font',fonts[f]||fonts['Manrope']);
-  document.body.style.fontFamily=fonts[f]||fonts['Manrope'];
-  localStorage.setItem(APP_CONFIG.FONT_KEY,f);
-  document.querySelectorAll('.font-btn').forEach(b=>b.classList.toggle('active',b.dataset.font===f));
-}
+// applyFont removed
 async function syncSettingsToSheet(){
   if(!state.scriptUrl||!state.token)return;
   try{
-    await apiPost({action:'updateSettings',expCats:getExpCats(),incCats:getIncCats(),cards:getCards()});
+    const profiles=getProfiles();
+    await apiPost({
+      action:'updateSettings',
+      expCats:getExpCats(),
+      incCats:getIncCats(),
+      cards:getCards(),
+      cardsEvgen:getCards('Євген'),
+      cardsMarina:getCards('Марина'),
+      profiles:profiles,
+    });
   }catch(e){console.warn('Settings sync failed:',e);}
+}
+// Завантажуємо налаштування з таблиці при старті — перезаписуємо localStorage
+async function fetchSettingsFromSheet(){
+  if(!state.scriptUrl||!state.token)return;
+  try{
+    const d=await apiGet('settings');
+    if(!d)return;
+    if(d.expCats){localStorage.setItem(APP_CONFIG.EXP_CATS_KEY,JSON.stringify(d.expCats));}
+    if(d.incCats){localStorage.setItem(APP_CONFIG.INC_CATS_KEY,JSON.stringify(d.incCats));}
+    if(d.cards){localStorage.setItem(APP_CONFIG.CARDS_KEY,JSON.stringify(d.cards));}
+    if(d.cardsEvgen){localStorage.setItem(APP_CONFIG.CARDS_KEY+'_Євген',JSON.stringify(d.cardsEvgen));}
+    if(d.cardsMarina){localStorage.setItem(APP_CONFIG.CARDS_KEY+'_Марина',JSON.stringify(d.cardsMarina));}
+    if(d.profiles){
+      localStorage.setItem(APP_CONFIG.PROFILES_KEY,JSON.stringify(d.profiles));
+      // Застосовуємо профіль поточного юзера
+      const member=getMyMember();
+      const myProf=d.profiles[member];
+      if(myProf){
+        if(myProf.name){localStorage.setItem(APP_CONFIG.USERNAME_KEY,myProf.name);updateUserUI();}
+        if(myProf.avatar){localStorage.setItem(APP_CONFIG.AVATAR_KEY,myProf.avatar);applyAvatar(myProf.avatar);}
+      }
+    }
+    localStorage.setItem(APP_CONFIG.LAST_SYNC_KEY,new Date().toISOString());
+    // Оновлюємо UI якщо на дашборді
+    if(state.currentPage==='dashboard')renderMemberColumns();
+    if(state.currentPage==='settings')renderSettingsUI();
+  }catch(e){console.warn('Fetch settings failed:',e);}
 }
 function applyTheme(t){document.body.setAttribute('data-theme',t);localStorage.setItem(APP_CONFIG.THEME_KEY,t);document.querySelectorAll('.theme-btn').forEach(b=>b.classList.toggle('active',b.dataset.theme===t));}
 
 // ── ICON PICKER ───────────────────────────────────────────────────
 function openIconPicker(mode){
   // mode: 'expense' | 'income' | 'card'
-  const inputId = mode==='card' ? 'new-card' : (mode==='income' ? 'new-income-cat' : 'new-expense-cat');
+  let memberForCard=null;
+  if(mode==='card-evgen')memberForCard='Євген';
+  else if(mode==='card-marina')memberForCard='Марина';
+  const baseMode=mode.startsWith('card')?'card':mode;
+  const inputId = baseMode==='card' ? ('new-card'+(memberForCard?'-'+memberForCard.toLowerCase():'')) : (mode==='income' ? 'new-income-cat' : 'new-expense-cat');
   const nameVal = (document.getElementById(inputId)||{}).value||'';
   if(!nameVal.trim()){showToast('Спочатку введи назву','error');return;}
 
@@ -743,10 +879,9 @@ function openIconPicker(mode){
   div.querySelector('#ip-save').addEventListener('click',()=>{
     const name=nameVal.trim();
     const item={id:name,icon:selIcon,bg:selColor.bg,color:selColor.color};
-    if(mode==='expense'){const list=getExpCats();list.push(item);localStorage.setItem(APP_CONFIG.EXP_CATS_KEY,JSON.stringify(list));}
-    else if(mode==='income'){const list=getIncCats();list.push(item);localStorage.setItem(APP_CONFIG.INC_CATS_KEY,JSON.stringify(list));}
-    else if(mode==='card'){saveCards([...getCards(),item]);}
-    syncSettingsToSheet();
+    if(mode==='expense'){const list=getExpCats();list.push(item);localStorage.setItem(APP_CONFIG.EXP_CATS_KEY,JSON.stringify(list));syncSettingsToSheet();}
+    else if(mode==='income'){const list=getIncCats();list.push(item);localStorage.setItem(APP_CONFIG.INC_CATS_KEY,JSON.stringify(list));syncSettingsToSheet();}
+    else if(baseMode==='card'){saveCards([...getCards(memberForCard),item],memberForCard);renderMemberColumns();}
     const inp=document.getElementById(inputId);if(inp)inp.value='';
     renderSettingsUI();div.remove();showToast('✅ Додано!');
   });
@@ -788,6 +923,14 @@ function bindEvents(){
   document.getElementById('res-currency-btn').addEventListener('click',cycleReserveCurrency);
   // Save buttons
   document.getElementById('save-btn').addEventListener('click',submitOperation);
+  // Owner buttons in modal
+  document.querySelectorAll('.owner-modal-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      state.modalMember=b.dataset.owner;
+      state.selectedCard=''; // скидаємо картку при зміні члена
+      updateModalOwner();
+    });
+  });
   document.getElementById('res-save-btn').addEventListener('click',submitReserve);
   document.getElementById('goal-save-btn').addEventListener('click',submitGoal);
   document.getElementById('transfer-save-btn').addEventListener('click',submitTransfer);
@@ -805,10 +948,20 @@ function bindEvents(){
       if(panel)panel.classList.add('active');
     });
   });
+  // Member cards tabs
+  document.querySelectorAll('.mc-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('.mc-tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.mc-panel').forEach(p=>p.classList.remove('active'));
+      const panel=document.getElementById('mc-panel-'+btn.dataset.mctab);
+      if(panel)panel.classList.add('active');
+    });
+  });
   // Settings
   document.getElementById('logout-btn').addEventListener('click',logout);
   document.getElementById('set-url-btn').addEventListener('click',setScriptUrl);
-  document.getElementById('sync-now-btn').addEventListener('click',()=>{loadFx();loadPageData(state.currentPage);showToast('🔄 Синхронізація...');});
+  // sync-now-btn handled above
   // Family name
   document.getElementById('save-family-btn').addEventListener('click',()=>{
     const v=document.getElementById('family-name-input').value.trim();
@@ -820,13 +973,24 @@ function bindEvents(){
     localStorage.setItem(APP_CONFIG.USERNAME_KEY,v);
     const ini=getInitials(v);setText('sb-avatar',ini);setText('sb-user-name',v);setText('topbar-av-text',ini);setText('greeting-text',getGreeting(v));
     const pp=document.getElementById('profile-av-placeholder');if(pp)pp.textContent=ini;
+    // Зберігаємо в профіль і синхронізуємо
+    const member=getMyMember();const profs=getProfiles();
+    profs[member]=profs[member]||{};profs[member].name=v;
+    saveProfiles(profs);
   });
   // Avatar upload
   document.getElementById('profile-av-upload').addEventListener('click',()=>document.getElementById('avatar-file-input').click());
   document.getElementById('avatar-file-input').addEventListener('change',e=>{
     const file=e.target.files[0];if(!file)return;
     const reader=new FileReader();
-    reader.onload=ev=>{const url=ev.target.result;localStorage.setItem(APP_CONFIG.AVATAR_KEY,url);applyAvatar(url);showToast('✅ Аватар збережено!');};
+    reader.onload=ev=>{
+      const url=ev.target.result;
+      localStorage.setItem(APP_CONFIG.AVATAR_KEY,url);applyAvatar(url);
+      // Зберігаємо в профіль і синхронізуємо
+      const member=getMyMember();const profs=getProfiles();
+      profs[member]=profs[member]||{};profs[member].avatar=url;
+      saveProfiles(profs);showToast('✅ Аватар збережено!');
+    };
     reader.readAsDataURL(file);
   });
   // Mono tokens
@@ -847,7 +1011,11 @@ function bindEvents(){
   // Add categories
   document.getElementById('add-expense-cat').addEventListener('click',()=>openIconPicker('expense'));
   document.getElementById('add-income-cat').addEventListener('click',()=>openIconPicker('income'));
-  document.getElementById('add-card').addEventListener('click',()=>openIconPicker('card'));
+  const acE=document.getElementById('add-card-evgen');if(acE)acE.addEventListener('click',()=>openIconPicker('card-evgen'));
+  const acM=document.getElementById('add-card-marina');if(acM)acM.addEventListener('click',()=>openIconPicker('card-marina'));
+  // Кнопка ручної синхронізації
+  const syncBtn=document.getElementById('sync-now-btn');
+  if(syncBtn)syncBtn.addEventListener('click',()=>{fetchSettingsFromSheet();loadFx();loadPageData(state.currentPage);showToast('🔄 Синхронізація...');});
   // Filters
   document.querySelectorAll('.filter-pill').forEach(b=>b.addEventListener('click',()=>{
     document.querySelectorAll('.filter-pill').forEach(x=>x.classList.remove('active'));
