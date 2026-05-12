@@ -217,14 +217,26 @@ function loadPageData(page){
 async function apiGet(action,params={}){
   if(!state.scriptUrl)return null;
   const url=new URL(state.scriptUrl);
-  url.searchParams.set('action',action);url.searchParams.set('token',state.token||'');
+  url.searchParams.set('action',action);
+  url.searchParams.set('token',state.token||'');
+  url.searchParams.set('tokenType','access');
   Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-  const r=await fetch(url.toString());if(!r.ok)throw new Error('API '+r.status);return r.json();
+  const r=await fetch(url.toString(),{redirect:'follow'});
+  if(!r.ok)throw new Error('API '+r.status);
+  const text=await r.text();
+  try{return JSON.parse(text);}catch{return null;}
 }
 async function apiPost(body){
   if(!state.scriptUrl)return null;
-  const r=await fetch(state.scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,token:state.token})});
-  if(!r.ok)throw new Error('API '+r.status);return r.json();
+  const url=new URL(state.scriptUrl);
+  url.searchParams.set('method','POST');
+  url.searchParams.set('token',state.token||'');
+  url.searchParams.set('tokenType','access');
+  url.searchParams.set('payload',JSON.stringify(body));
+  const r=await fetch(url.toString(),{redirect:'follow'});
+  if(!r.ok)throw new Error('API '+r.status);
+  const text=await r.text();
+  try{return JSON.parse(text);}catch{return null;}
 }
 async function fetchDashboard(){try{const d=await apiGet('dashboard');if(d&&!d.error){state.dashboard=d;renderDashboard(d);renderMemberColumns();}}catch(e){console.warn('fetchDashboard:',e);}}
 async function fetchTransfers(){try{const d=await apiGet('transfers');if(d){state.transfers=d.transfers||[];}}catch(e){console.warn('fetchTransfers:',e);}}
@@ -1395,7 +1407,7 @@ function bindEvents(){
   document.getElementById('add-btn-dash').addEventListener('click',()=>openModal());
   const aob=document.getElementById('add-btn-ops');if(aob)aob.addEventListener('click',()=>openModal());
   document.getElementById('add-reserve-btn').addEventListener('click',openReserveModal);
-  document.getElementById('add-goal-btn').addEventListener('click',()=>openGoalModal());
+  const agb=document.getElementById('add-goal-btn');if(agb)agb.addEventListener('click',()=>openGoalModal());
   document.getElementById('modal-overlay').addEventListener('click',closeModal);
   // Type toggles
   document.getElementById('tt-expense').addEventListener('click',()=>setType('Витрата'));
@@ -1416,8 +1428,8 @@ function bindEvents(){
     });
   });
   document.getElementById('res-save-btn').addEventListener('click',submitReserve);
-  document.getElementById('goal-save-btn').addEventListener('click',submitGoal);
-  document.getElementById('transfer-save-btn').addEventListener('click',submitTransfer);
+  const _el_goal_save_btn=document.getElementById('goal-save-btn');if(_el_goal_save_btn)_el_goal_save_btn.addEventListener('click',submitGoal);
+  const _el_transfer_save_btn=document.getElementById('transfer-save-btn');if(_el_transfer_save_btn)_el_transfer_save_btn.addEventListener('click',submitTransfer);
   // Theme & scale
   document.querySelectorAll('.theme-btn').forEach(b=>b.addEventListener('click',()=>applyTheme(b.dataset.theme)));
   document.querySelectorAll('.scale-btn').forEach(b=>b.addEventListener('click',()=>applyScale(b.dataset.scale)));
