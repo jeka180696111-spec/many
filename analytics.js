@@ -1,46 +1,128 @@
 // ═══════════════════════════════════════════════════════════════
-// ANALYTICS — аналітика витрат
+// ANALYTICS — повна сторінка аналізу: Місяць / Квартал / Рік
 // ═══════════════════════════════════════════════════════════════
 
-import { state } from './config.js';
-import { esc, fmtMoney } from './utils.js';
-import { getExpCats } from './storage.js';
+import { state, FAMILY_MEMBERS } from './config.js';
+import { apiGet } from './api.js';
+import { esc, fmtMoney, fmtMoneyShort, log } from './utils.js';
+import { getExpCats, getProfiles, getDashPeriod, setDashPeriod, getViewAsMember } from './storage.js';
+
+let analyticsData = null;
+let loading = false;
+
+export async function loadAnalytics() {
+  if (loading) return;
+  loading = true;
+  try {
+    const period = getDashPeriod();
+    const data = await apiGet('dashboard', { period });
+    analyticsData = data;
+    renderAnalyticsPage();
+  } catch (e) {
+    log('loadAnalytics error:', e.message);
+    renderAnalyticsPage();
+  } finally {
+    loading = false;
+  }
+}
 
 export function renderAnalyticsPage() {
   const el = document.getElementById('page-analytics');
   if (!el) return;
 
-  const d = state.dashboard || {};
-  const byCat = d.byCategory || {};
-  const byDay = d.byDay || {};
-  const total = d.totalExpense || 0;
+  const d = analyticsData || state.dashboard || { totalIncome: 0, totalExpense: 0, balance: 0, byMember: {}, byCategory: {}, byDay: {}, byDayIncome: {} };
+  const period = getDashPeriod();
+  const viewAs = getViewAsMember();
+  const profiles = getProfiles();
   const catsList = getExpCats();
 
-  // Сортуємо категорії за сумою
+  // Заголовок періоду
+  const now = new Date();
+  let periodLabel = '';
+  if (period === 'month') {
+    periodLabel = now.toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' });
+  } else if (period === 'quarter') {
+    const q = Math.floor(now.getMonth() / 3) + 1;
+    periodLabel = `Q${q} ${now.getFullYear()}`;
+  } else {
+    periodLabel = String(now.getFullYear());
+  }
+
+  // Фільтр по viewAs (як на дашборді)
+  let totalIncome = d.totalIncome || 0;
+  let totalExpense = d.totalExpense || 0;
+  if (viewAs && d.byMember && d.byMember[viewAs]) {
+    totalIncome = d.byMember[viewAs].income || 0;
+    totalExpense = d.byMember[viewAs].expense || 0;
+  }
+  const balance = totalIncome - totalExpense;
+  const savRate = totalIncome > 0 ? Math.round((totalIncome - totalExpense) / totalIncome * 100) : 0;
+
+  const byCat = d.byCategory || {};
+  const byDay = d.byDay || {};
   const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
 
   el.innerHTML = `
     <div class="page-inner">
       <div class="page-head">
-        <h1 class="page-title">Аналіз</h1>
+        <h1 class="page-title">Аналіз${viewAs ? ' · ' + esc(profiles[viewAs]?.name || viewAs) : ''}</h1>
       </div>
 
-      <div class="dash-card">
-        <div class="dash-card-head">
-          <span class="dash-card-title">Витрати по днях</span>
-          <span class="dash-card-amount">${fmtMoney(total, 'UAH')}</span>
+      <!-- Перемикач періоду -->
+      <div class="period-switch">
+        <button class="period-btn ${period === 'month' ? 'active' : ''}" data-period="month">Місяць</button>
+        <button class="period-btn ${period === 'quarter' ? 'active' : ''}" data-period="quarter">Квартал</button>
+        <button class="period-btn ${period === 'year' ? 'active' : ''}" data-period="year">Рік</button>
+      </div>
+
+      <!-- Підсумок 3 цифри -->
+      <div class="ops-summary">
+        <div class="ops-summary-item ops-summary-inc">
+          <div class="ops-summary-label">Доходи · ${esc(periodLabel)}</div>
+          <div class="ops-summary-amount">+${fmtMoney(totalIncome, 'UAH')}</div>
         </div>
-        ${renderDayChart(byDay)}
+        <div class="ops-summary-item ops-summary-exp">
+          <div class="ops-summary-label">Витрати · ${esc(periodLabel)}</div>
+          <div class="ops-summary-amount">−${fmtMoney(totalExpense, 'UAH')}</div>
+        </div>
+        <div class="ops-summary-item ops-summary-bal">
+          <div class="ops-summary-label">Баланс</div>
+          <div class="ops-summary-amount ${balance >= 0 ? 'c-green' : 'c-red'}">${balance >= 0 ? '+' : '−'}${fmtMoney(Math.abs(balance), 'UAH')}</div>
+        </div>
       </div>
 
+      <!-- Накопичено % -->
+      ${totalIncome > 0 ? `
+        <div class="analytics-savings">
+          <div class="analytics-savings-label">Норма заощаджень</div>
+          <div class="analytics-savings-bar">
+            <div class="analytics-savings-fill ${savRate >= 0 ? 'pos' : 'neg'}" style="width:${Math.min(100, Math.abs(savRate))}%"></div>
+          </div>
+          <div class="analytics-savings-text">${savRate >= 0 ? `Зекономлено ${savRate}% доходів` : `Витрачено на ${Math.abs(savRate)}% більше за доходи`}</div>
+        </div>
+      ` : ''}
+
+      <!-- Графік по днях -->
+      ${period === 'month' && Object.keys(byDay).length ? `
+        <div class="dash-card">
+          <div class="dash-card-head">
+            <span class="dash-card-title">Витрати по днях</span>
+            <span class="dash-card-amount c-red">${fmtMoney(totalExpense, 'UAH')}</span>
+          </div>
+          ${renderDayChart(byDay, now)}
+        </div>
+      ` : ''}
+
+      <!-- По категоріях -->
       <div class="dash-card">
         <div class="dash-card-head">
           <span class="dash-card-title">По категоріях</span>
+          <span class="dash-card-amount">${sorted.length} ${sorted.length === 1 ? 'категорія' : 'категорій'}</span>
         </div>
-        ${sorted.length === 0 ? '<div class="empty-mini">Немає даних</div>' :
+        ${sorted.length === 0 ? '<div class="empty-mini">Немає витрат у цьому періоді</div>' :
           `<div class="dash-cats-list">
             ${sorted.map(([cat, val]) => {
-              const pct = total ? (val / total * 100).toFixed(0) : 0;
+              const pct = totalExpense ? (val / totalExpense * 100).toFixed(0) : 0;
               const catMeta = catsList.find(c => c.id === cat) || {};
               return `
                 <div class="dash-cat-row">
@@ -56,22 +138,70 @@ export function renderAnalyticsPage() {
           </div>`
         }
       </div>
+
+      <!-- По членах сім'ї -->
+      ${!viewAs ? renderByMember(d.byMember || {}) : ''}
+    </div>
+  `;
+
+  bindHandlers(el);
+}
+
+function renderByMember(byMember) {
+  const entries = Object.entries(byMember).filter(([k]) => k);
+  if (!entries.length) return '';
+  const profiles = getProfiles();
+  return `
+    <div class="dash-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">По членах сім'ї</span>
+      </div>
+      <div class="analytics-members">
+        ${entries.map(([name, info]) => {
+          const inc = info.income || 0;
+          const exp = info.expense || 0;
+          const bal = info.balance || 0;
+          return `
+            <div class="analytics-member-card">
+              <div class="analytics-member-head">
+                <div class="topbar-viewas-avatar" style="width:36px;height:36px;font-size:14px">${(profiles[name]?.name || name)[0]}</div>
+                <div class="analytics-member-name">${esc(profiles[name]?.name || name)}</div>
+              </div>
+              <div class="analytics-member-stats">
+                <div class="analytics-member-stat">
+                  <div class="analytics-member-stat-label">Дохід</div>
+                  <div class="analytics-member-stat-value c-green">+${fmtMoney(inc, 'UAH')}</div>
+                </div>
+                <div class="analytics-member-stat">
+                  <div class="analytics-member-stat-label">Витрата</div>
+                  <div class="analytics-member-stat-value c-red">−${fmtMoney(exp, 'UAH')}</div>
+                </div>
+                <div class="analytics-member-stat">
+                  <div class="analytics-member-stat-label">Баланс</div>
+                  <div class="analytics-member-stat-value ${bal >= 0 ? 'c-green' : 'c-red'}">${bal >= 0 ? '+' : '−'}${fmtMoney(Math.abs(bal), 'UAH')}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
 
-function renderDayChart(byDay) {
+function renderDayChart(byDay, monthDate) {
   const days = Object.keys(byDay).map(Number).sort((a, b) => a - b);
-  if (!days.length) return '<div class="empty-mini">Немає витрат у цьому місяці</div>';
+  if (!days.length) return '<div class="empty-mini">Немає витрат</div>';
   const max = Math.max(...days.map(d => byDay[d]));
   const today = new Date().getDate();
+  const isCurMonth = monthDate.getMonth() === new Date().getMonth() && monthDate.getFullYear() === new Date().getFullYear();
 
   return `
     <div class="analytics-bars">
       ${days.map(d => {
         const v = byDay[d];
         const h = max ? (v / max * 100) : 0;
-        const isToday = d === today && state.currentMonth.getMonth() === new Date().getMonth();
+        const isToday = isCurMonth && d === today;
         return `
           <div class="analytics-bar-col" title="${d}: ${fmtMoney(v, 'UAH')}">
             <div class="analytics-bar" style="height:${h}%;${isToday ? 'background:var(--c-accent)' : ''}"></div>
@@ -81,4 +211,13 @@ function renderDayChart(byDay) {
       }).join('')}
     </div>
   `;
+}
+
+function bindHandlers(el) {
+  el.querySelectorAll('[data-period]').forEach(b => {
+    b.addEventListener('click', () => {
+      setDashPeriod(b.dataset.period);
+      loadAnalytics();
+    });
+  });
 }
