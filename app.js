@@ -223,11 +223,12 @@ async function apiGet(action,params={}){
 }
 async function apiPost(body){
   if(!state.scriptUrl)return null;
+  // Apps Script не приймає справжній POST через CORS.
+  // Використовуємо GET з payload= параметром — doGet його розпізнає і роутить як POST
   const url=new URL(state.scriptUrl);
-  url.searchParams.set('method','POST');
   url.searchParams.set('key',APP_CONFIG.SECRET_KEY);
   url.searchParams.set('payload',JSON.stringify(body));
-  const r=await fetch(url.toString(),{redirect:'follow'});
+  const r=await fetch(url.toString());
   if(!r.ok)throw new Error('API '+r.status);
   const text=await r.text();
   try{return JSON.parse(text);}catch{return null;}
@@ -261,21 +262,6 @@ function renderDashboard(d){
   renderDailyChart(d.byDay||{});
   updateMonthLabel();
 }
-// Категорії карток для відображення в групах
-const CARD_GROUPS={
-  credit:{label:'Кредитні',icon:'ti-credit-card',match:['кредитна','кредит','credit']},
-  cash:  {label:'Готівка',icon:'ti-cash',match:['готівка','наліч','cash']},
-  savings:{label:'Накопичення',icon:'ti-piggy-bank',match:['накопич','savings','ощад','депозит']},
-  cards: {label:'Картки',icon:'ti-cards',match:[]}, // все решта
-};
-function getCardGroup(cardId){
-  const low=(cardId||'').toLowerCase();
-  for(const[gid,g] of Object.entries(CARD_GROUPS)){
-    if(gid==='cards')continue;
-    if(g.match.some(m=>low.includes(m)))return gid;
-  }
-  return'cards';
-}
 function renderMemberColumns(){
   const el=document.getElementById('members-columns');if(!el)return;
   const profiles=getProfiles();
@@ -284,68 +270,38 @@ function renderMemberColumns(){
     const mc=MEMBER_COLORS[member]||{bg:'var(--c-bg-3)',cl:'var(--c-text)',initials:'??'};
     const prof=profiles[member]||{name:member,avatar:null};
     const cards=getCards(member);
+    // Баланс по картках — з операцій і з dashboardbyMember
     const memberData=byMember[member]||{income:0,expense:0,byCard:{}};
-    // Загальний баланс
-    const displayBal=state.operations.length
-      ? state.operations.filter(o=>o.who===member).reduce((s,o)=>{
-          if(o.type==='Дохід')return s+(o.amountUah||o.amount);
-          if(o.type==='Витрата')return s-(o.amountUah||o.amount);
-          return s;},0)
-      : memberData.income-memberData.expense;
+    const totalBal=memberData.income-memberData.expense;
+    const cardsHtml=cards.map(c=>{
+      const cardData=memberData.byCard?.[c.id]||{income:0,expense:0};
+      const bal=cardData.income-cardData.expense;
+      // Локальний баланс з state.operations
+      const localBal=state.operations.filter(o=>o.who===member&&o.card===c.id).reduce((s,o)=>{if(o.type==='Дохід')return s+(o.amountUah||o.amount);if(o.type==='Витрата')return s-(o.amountUah||o.amount);return s;},0);
+      const displayBal=state.operations.length?localBal:bal;
+      return `<div class="member-card-chip" data-member="${esc(member)}" data-account="${esc(c.id)}">
+        <div class="mcc-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
+        <div class="mcc-info">
+          <div class="mcc-name">${esc(c.id)}</div>
+          <div class="mcc-bal ${displayBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(displayBal),'UAH')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    const displayBal=state.operations.length?state.operations.filter(o=>o.who===member).reduce((s,o)=>{if(o.type==='Дохід')return s+(o.amountUah||o.amount);if(o.type==='Витрата')return s-(o.amountUah||o.amount);return s;},0):totalBal;
     const avatarHtml=prof.avatar
       ?`<img src="${prof.avatar}" class="member-col-av-img">`
       :`<div class="member-col-av" style="background:${mc.bg};color:${mc.cl}">${mc.initials}</div>`;
-    // Групуємо картки
-    const grouped={};
-    cards.forEach(c=>{
-      const g=getCardGroup(c.id);
-      if(!grouped[g])grouped[g]=[];
-      grouped[g].push(c);
-    });
-    // Рахуємо баланс кожної картки
-    const cardBal=(c)=>{
-      const localBal=state.operations.filter(o=>o.who===member&&o.card===c.id).reduce((s,o)=>{
-        if(o.type==='Дохід')return s+(o.amountUah||o.amount);
-        if(o.type==='Витрата')return s-(o.amountUah||o.amount);return s;},0);
-      const remBal=(memberData.byCard?.[c.id]?.income||0)-(memberData.byCard?.[c.id]?.expense||0);
-      return state.operations.length?localBal:remBal;
-    };
-    let cardsHtml='';
-    for(const[gid,grp] of Object.entries(CARD_GROUPS)){
-      if(!grouped[gid]||!grouped[gid].length)continue;
-      cardsHtml+=`<div class="member-cards-group-label"><i class="ti ${grp.icon}"></i>${grp.label}</div>`;
-      cardsHtml+=grouped[gid].map(c=>{
-        const bal=cardBal(c);
-        return `<div class="wallet-card" data-member="${esc(member)}" data-account="${esc(c.id)}">
-          <div class="wallet-card-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
-          <div class="wallet-card-name">${esc(c.id)}</div>
-          <div class="wallet-card-bal ${bal>=0?'pos':'neg'}">${fmtMoney(Math.abs(bal),'UAH')}</div>
-        </div>`;
-      }).join('');
-    }
-    return `<div class="member-col" data-member="${esc(member)}">
+    return `<div class="member-col">
       <div class="member-col-head">
         <div class="member-col-av-wrap">${avatarHtml}</div>
         <div class="member-col-name">${esc(prof.name||member)}</div>
         <div class="member-col-total ${displayBal>=0?'pos':'neg'}">${fmtMoney(Math.abs(displayBal),'UAH')}</div>
-        <i class="ti ti-chevron-down member-col-chevron"></i>
       </div>
-      <div class="member-cards-wrap" id="mc-wrap-${esc(member)}">${cardsHtml}</div>
+      <div class="member-cards">${cardsHtml}</div>
     </div>`;
   }).join('');
-  // Клік по хеду — розгорнути/згорнути
-  el.querySelectorAll('.member-col-head').forEach(hd=>{
-    hd.addEventListener('click',()=>{
-      const col=hd.closest('.member-col');
-      const wrap=col.querySelector('.member-cards-wrap');
-      const chev=col.querySelector('.member-col-chevron');
-      const open=wrap.style.display!=='none';
-      wrap.style.display=open?'none':'flex';
-      chev.style.transform=open?'rotate(-90deg)':'';
-    });
-  });
-  el.querySelectorAll('.wallet-card').forEach(ch=>{
-    ch.addEventListener('click',e=>{e.stopPropagation();openAccountDetail(ch.dataset.account,ch.dataset.member);});
+  el.querySelectorAll('.member-card-chip').forEach(ch=>{
+    ch.addEventListener('click',()=>openAccountDetail(ch.dataset.account,ch.dataset.member));
   });
 }
 function renderAccountChips(){
@@ -529,96 +485,32 @@ function updateCalKPI(){
   setText('cal-balance',fmtMoney(inc-exp,'UAH'));
 }
 function renderCalendar(){
-  const period=state.calPeriod||'month';
-  updateCalKPI();
-  if(period==='month') renderCalMonth();
-  else if(period==='3m')  renderCalMultiMonth(3);
-  else if(period==='6m')  renderCalMultiMonth(6);
-  else if(period==='year') renderCalYear();
-}
-function renderCalMonth(){
   const d=state.calMonth;
   const y=d.getFullYear(),m=d.getMonth();
   setText('cal-month-label',MONTH_UK[m]+' '+y);
-  const firstDay=(new Date(y,m,1).getDay()+6)%7;
+  const firstDay=(new Date(y,m,1).getDay()+6)%7; // Mon=0
   const daysInMonth=new Date(y,m+1,0).getDate();
+  const ops=state.operations.filter(o=>{
+    const od=new Date(o.date);return od.getFullYear()===y&&od.getMonth()===m&&o.type==="Витрата";
+  });
   const byDay={};
-  state.operations.filter(o=>{const od=new Date(o.date);return od.getFullYear()===y&&od.getMonth()===m&&o.type==="Vitrata";})
-    .forEach(o=>{const day=new Date(o.date).getDate();byDay[day]=(byDay[day]||0)+(o.amountUah||o.amount);});
-  // Fix: use Ukrainian string comparison
-  const ops2=state.operations.filter(o=>{const od=new Date(o.date);return od.getFullYear()===y&&od.getMonth()===m&&o.type==="\u0412\u0438\u0442\u0440\u0430\u0442\u0430";});
-  const byDay2={};ops2.forEach(o=>{const day=new Date(o.date).getDate();byDay2[day]=(byDay2[day]||0)+(o.amountUah||o.amount);});
+  ops.forEach(o=>{const day=new Date(o.date).getDate();byDay[day]=(byDay[day]||0)+(o.amountUah||o.amount);});
   const today=new Date();
-  const headers=["\u041f\u043d","\u0412\u0442","\u0421\u0440","\u0427\u0442","\u041f\u0442","\u0421\u0431","\u041d\u0434"];
-  let html="";
-  html+=headers.map(h=>"<div class=\"cal-header\">"+h+"</div>").join("");
-  for(let i=0;i<firstDay;i++)html+="<div class=\"cal-day empty\"></div>";
+  const headers=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
+  let html=headers.map(h=>'<div class="cal-header">'+h+'</div>').join('');
+  for(let i=0;i<firstDay;i++)html+='<div class="cal-day empty"></div>';
   for(let day=1;day<=daysInMonth;day++){
-    const amt=byDay2[day]||0;
+    const amt=byDay[day]||0;
     const isToday=today.getDate()===day&&today.getMonth()===m&&today.getFullYear()===y;
-    html+="<div class=\"cal-day"+(isToday?" today":"")+"\" data-day=\""+day+"\" data-m=\""+m+"\" data-y=\""+y+"\"><div class=\"cal-day-num\">"+day+"</div>"+(amt>0?"<div class=\"cal-day-amt\">"+fmtMoney(amt,"UAH")+"</div>":"")+"</div>";
+    html+='<div class="cal-day'+(isToday?' today':'')+'" data-day="'+day+'"><div class="cal-day-num">'+day+'</div>'+(amt>0?'<div class="cal-day-amt">'+fmtMoney(amt,"UAH")+'</div>':'')+'</div>';
   }
-  document.getElementById("cal-grid").innerHTML=html;
-  addCalDayListeners();
-}
-function renderCalMultiMonth(count){
-  const now=state.calMonth;
-  const grid=document.getElementById("cal-grid");
-  let html="";
-  for(let i=count-1;i>=0;i--){
-    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
-    const y=d.getFullYear(),m=d.getMonth();
-    const firstDay=(new Date(y,m,1).getDay()+6)%7;
-    const daysInMonth=new Date(y,m+1,0).getDate();
-    const byDay={};
-    state.operations.filter(o=>{const od=new Date(o.date);return od.getFullYear()===y&&od.getMonth()===m&&o.type==="\u0412\u0438\u0442\u0440\u0430\u0442\u0430";})
-      .forEach(o=>{const day=new Date(o.date).getDate();byDay[day]=(byDay[day]||0)+(o.amountUah||o.amount);});
-    const headers=["\u041f\u043d","\u0412\u0442","\u0421\u0440","\u0427\u0442","\u041f\u0442","\u0421\u0431","\u041d\u0434"];
-    html+="<div class=\"cal-multimonth-block\">";
-    html+="<div class=\"cal-multimonth-title\">"+MONTH_UK[m]+" "+y+"</div>";
-    html+="<div class=\"cal-week-grid\">";
-    html+=headers.map(h=>"<div class=\"cal-header\">"+h+"</div>").join("");
-    let dayNum=1;
-    const weeks=Math.ceil((firstDay+daysInMonth)/7);
-    for(let w=0;w<weeks;w++){
-      for(let dw=0;dw<7;dw++){
-        if(w===0&&dw<firstDay||dayNum>daysInMonth){html+="<div class=\"cal-day empty\"></div>";}
-        else{
-          const amt=byDay[dayNum]||0;
-          html+="<div class=\"cal-day cal-day-sm\" data-day=\""+dayNum+"\" data-m=\""+m+"\" data-y=\""+y+"\"><div class=\"cal-day-num\">"+dayNum+"</div>"+(amt?"<div class=\"cal-day-dot\"></div>":"")+"</div>";
-          dayNum++;
-        }
-      }
-    }
-    html+="</div></div>";
-  }
-  setText("cal-month-label",count+"м");
-  grid.innerHTML=html;
-  addCalDayListeners();
-}
-function renderCalYear(){
-  const y=state.calMonth.getFullYear();
-  setText("cal-month-label",String(y));
-  const byMonth=new Array(12).fill(0);
-  state.operations.filter(o=>{const d=new Date(o.date);return d.getFullYear()===y&&o.type==="\u0412\u0438\u0442\u0440\u0430\u0442\u0430";})
-    .forEach(o=>{byMonth[new Date(o.date).getMonth()]+=(o.amountUah||o.amount);});
-  const mx=Math.max(...byMonth,1);
-  const today=new Date();
-  let html="<div class=\"cal-year-grid\">";
-  html+=MONTH_UK.map((mn,mi)=>{
-    const h=Math.max(Math.round(byMonth[mi]/mx*80),byMonth[mi]>0?4:0);
-    const isCur=today.getMonth()===mi&&today.getFullYear()===y;
-    return "<div class=\"cal-year-col"+(isCur?" today":"")+"\">"+"<div class=\"cal-year-bar-wrap\" title=\""+mn+": "+fmtMoney(byMonth[mi],"UAH")+"\"><div class=\"cal-year-bar\" style=\"height:"+h+"px\"></div></div><div class=\"cal-year-amt\">"+(byMonth[mi]>0?fmtMoney(byMonth[mi],"UAH"):"")+"</div><div class=\"cal-year-label\">"+mn.substring(0,3)+"</div></div>";
-  }).join("");
-  html+="</div>";
-  document.getElementById("cal-grid").innerHTML=html;
-}
-function addCalDayListeners(){
-  document.querySelectorAll(".cal-day[data-day]").forEach(el=>{
-    el.addEventListener("click",()=>{
-      document.querySelectorAll(".cal-day").forEach(x=>x.classList.remove("selected"));
-      el.classList.add("selected");
-      showCalDay(parseInt(el.dataset.day),parseInt(el.dataset.m),parseInt(el.dataset.y));
+  document.getElementById('cal-grid').innerHTML=html;
+  updateCalKPI();
+  document.querySelectorAll('.cal-day[data-day]').forEach(el=>{
+    el.addEventListener('click',()=>{
+      document.querySelectorAll('.cal-day').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      showCalDay(parseInt(el.dataset.day),m,y);
     });
   });
 }
@@ -700,117 +592,14 @@ function renderSettingsUI(){
   const ss=document.getElementById('sync-status');
   if(ss){
     const lastSync=localStorage.getItem(APP_CONFIG.LAST_SYNC_KEY);
-    ss.textContent=state.scriptUrl?(lastSync?'● Синхр. '+new Date(lastSync).toLocaleTimeString('uk-UA',{hour:'2-digit',minute:'2-digit'}):'● Підключено'):'○ Не підключено';
+    ss.textContent=state.scriptUrl?(lastSync?'● Синхронізовано '+new Date(lastSync).toLocaleTimeString('uk-UA'):'● Підключено'):'○ Не підключено';
     ss.style.color=state.scriptUrl?'var(--c-green)':'var(--c-red)';
   }
-  // Категорії — акордеон
-  renderCatsAccordion('settings-cats-container');
-  // Профілі — акордеон
-  renderProfilesAccordion('settings-profiles-container');
-}
-
-function renderCatsAccordion(containerId){
-  const el=document.getElementById(containerId);if(!el)return;
-  // Витрати
-  const expList=getExpCats().map((c,i)=>`<div class="cat-accordion-item">
-    <div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
-    <div class="cat-accordion-name">${esc(c.id)}</div>
-    <button class="cat-del-btn" data-idx="${i}" data-inc="false"><i class="ti ti-x"></i></button>
-  </div>`).join('');
-  const incList=getIncCats().map((c,i)=>`<div class="cat-accordion-item">
-    <div class="cat-bar-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
-    <div class="cat-accordion-name">${esc(c.id)}</div>
-    <button class="cat-del-btn" data-idx="${i}" data-inc="true"><i class="ti ti-x"></i></button>
-  </div>`).join('');
-  el.innerHTML=`
-    <div class="settings-accordion-section">
-      <button class="settings-acc-btn" id="acc-exp-btn">
-        <i class="ti ti-arrow-up-circle" style="color:var(--c-red)"></i>
-        <span>Витрати <span class="settings-acc-count">${getExpCats().length}</span></span>
-        <i class="ti ti-chevron-down settings-acc-chev"></i>
-      </button>
-      <div class="settings-acc-body" id="acc-exp-body">
-        <div class="cat-accordion">${expList}</div>
-        <div class="settings-row-item">
-          <input class="settings-name-input flex1" id="new-expense-cat" placeholder="Назва категорії витрат">
-          <button class="btn-ghost-sm" id="add-expense-cat"><i class="ti ti-plus"></i> Іконка</button>
-        </div>
-      </div>
-    </div>
-    <div class="settings-accordion-section">
-      <button class="settings-acc-btn" id="acc-inc-btn">
-        <i class="ti ti-arrow-down-circle" style="color:var(--c-green)"></i>
-        <span>Доходи <span class="settings-acc-count">${getIncCats().length}</span></span>
-        <i class="ti ti-chevron-down settings-acc-chev"></i>
-      </button>
-      <div class="settings-acc-body" id="acc-inc-body" style="display:none">
-        <div class="cat-accordion">${incList}</div>
-        <div class="settings-row-item">
-          <input class="settings-name-input flex1" id="new-income-cat" placeholder="Назва категорії доходів">
-          <button class="btn-ghost-sm" id="add-income-cat"><i class="ti ti-plus"></i> Іконка</button>
-        </div>
-      </div>
-    </div>`;
-  bindCatsAccordion(el);
-}
-function bindCatsAccordion(el){
-  el.querySelectorAll('.settings-acc-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const body=btn.nextElementSibling;
-      const chev=btn.querySelector('.settings-acc-chev');
-      const open=body.style.display!=='none';
-      el.querySelectorAll('.settings-acc-body').forEach(b=>{b.style.display='none';});
-      el.querySelectorAll('.settings-acc-chev').forEach(c=>{c.style.transform='';});
-      if(!open){body.style.display='';chev.style.transform='rotate(180deg)';}
-    });
-  });
-  el.querySelectorAll('.cat-del-btn').forEach(b=>{
-    b.addEventListener('click',()=>{
-      const inc=b.dataset.inc==='true';
-      const key=inc?APP_CONFIG.INC_CATS_KEY:APP_CONFIG.EXP_CATS_KEY;
-      const list=inc?getIncCats():getExpCats();
-      list.splice(parseInt(b.dataset.idx),1);
-      localStorage.setItem(key,JSON.stringify(list));
-      syncSettingsToSheet();
-      renderSettingsUI();showToast('Категорію видалено');
-    });
-  });
-  const addExp=el.querySelector('#add-expense-cat');if(addExp)addExp.addEventListener('click',()=>openIconPicker('expense'));
-  const addInc=el.querySelector('#add-income-cat');if(addInc)addInc.addEventListener('click',()=>openIconPicker('income'));
-}
-
-function renderProfilesAccordion(containerId){
-  const el=document.getElementById(containerId);if(!el)return;
-  el.innerHTML=FAMILY_MEMBERS.map(member=>{
-    const slug=member==='Євген'?'evgen':'marina';
-    const mc=MEMBER_COLORS[member];
-    const count=getCards(member).length;
-    return `<div class="settings-accordion-section">
-      <button class="settings-acc-btn" id="acc-prof-${slug}-btn">
-        <div style="width:28px;height:28px;border-radius:50%;background:${mc.bg};color:${mc.cl};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${mc.initials}</div>
-        <span>${esc(member)} <span class="settings-acc-count">${count} рах.</span></span>
-        <i class="ti ti-chevron-down settings-acc-chev"></i>
-      </button>
-      <div class="settings-acc-body" id="acc-prof-${slug}-body" style="display:none">
-        <div id="member-profile-${slug}"></div>
-      </div>
-    </div>`;
-  }).join('');
-  el.querySelectorAll('.settings-acc-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const body=btn.nextElementSibling;const chev=btn.querySelector('.settings-acc-chev');
-      const open=body.style.display!=='none';
-      el.querySelectorAll('.settings-acc-body').forEach(b=>{b.style.display='none';});
-      el.querySelectorAll('.settings-acc-chev').forEach(c=>{c.style.transform='';});
-      if(!open){
-        body.style.display='';chev.style.transform='rotate(180deg)';
-        // Рендеримо профіль при першому відкритті
-        const slug=btn.id.includes('evgen')?'evgen':'marina';
-        const mem=slug==='evgen'?'Євген':'Марина';
-        renderMemberProfileCard(slug,mem);
-      }
-    });
-  });
+  renderCatsList('expense-cats-list',getExpCats(),false);
+  renderCatsList('income-cats-list',getIncCats(),true);
+  // Профілі членів + їх картки
+  renderMemberProfileCard('evgen','Євген');
+  renderMemberProfileCard('marina','Марина');
 }
 function renderMemberProfileCard(elemId, member){
   const el=document.getElementById('member-profile-'+elemId);if(!el)return;
@@ -1000,37 +789,27 @@ async function submitOperation(){
   const dtVal=document.getElementById('datetime-input').value;
   const dt=dtVal?new Date(dtVal).toISOString():new Date().toISOString();
   const btn=document.getElementById('save-btn');btn.disabled=true;btn.textContent='Збереження...';
-  try{
-    if(!state.selectedCard){showToast('Вибери рахунок','error');btn.disabled=false;updateModalType();return;}
-    const whoName=state.modalMember||getMyMember();
-    const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:whoName,date:dt,card:state.selectedCard,who:whoName};
-    // Зберігаємо локально одразу — не залежить від API
-    const localOp={...body,date:dt,amountUah:amt,who:whoName,_local:true};
-    state.operations.unshift(localOp);
-    closeModal();showToast('✅ Збережено!');
-    if(state.currentPage==='dashboard'){renderMemberColumns();renderRecentOps(state.operations);}
-    else if(state.currentPage==='operations')renderOperations();
-    else if(state.currentPage==='calendar')renderCalendar();
-    // Відправляємо на сервер — отримуємо row і знімаємо _local
-    if(state.scriptUrl){
-      apiPost(body)
-        .then(res=>{
-          if(res?.row){
-            localOp.row=res.row;
-            delete localOp._local;
-            showSyncStatus('ok');
-            // Перемальовуємо щоб кнопка edit з'явилась (тепер є row)
-            if(state.currentPage==='operations')renderOperations();
-            else if(state.currentPage==='dashboard')renderRecentOps(state.operations);
-          }
-        })
-        .catch(()=>{enqueue(body);showSyncStatus('pending');});
-    } else {
-      // Без scriptUrl — операція залишається локальною, редагування через індекс
-      localOp._localIdx=state.operations.indexOf(localOp);
-    }
-  }catch(e){console.error(e);showToast('Помилка: '+e.message,'error');}
-  finally{btn.disabled=false;updateModalType();}
+  // Закриваємо форму ОДРАЗУ — не чекаємо API
+  if(!state.selectedCard){showToast('Вибери рахунок','error');btn.disabled=false;updateModalType();return;}
+  const whoName=state.modalMember||getMyMember();
+  const body={action:'addOperation',type:state.currentType,category:state.selectedCat,amount:amt,currency:state.currentCurrency,desc:document.getElementById('desc-input').value||'',budget:whoName,date:dt,card:state.selectedCard,who:whoName};
+  // 1. Зберігаємо локально і закриваємо форму
+  const localOp={...body,date:dt,amountUah:amt,who:whoName,_local:true};
+  state.operations.unshift(localOp);
+  btn.disabled=false;updateModalType();closeModal();showToast('✅ Збережено!');
+  if(state.currentPage==='dashboard'){renderMemberColumns();renderRecentOps(state.operations);}
+  else if(state.currentPage==='operations')renderOperations();
+  else if(state.currentPage==='calendar')renderCalendar();
+  // 2. Фонова відправка на сервер
+  if(state.scriptUrl){
+    apiPost(body)
+      .then(res=>{
+        if(res?.row){localOp.row=res.row;delete localOp._local;showSyncStatus('ok');
+          if(state.currentPage==='operations')renderOperations();
+          else if(state.currentPage==='dashboard')renderRecentOps(state.operations);}
+      })
+      .catch(()=>{enqueue(body);showSyncStatus('pending');});
+  }
 }
 
 // Reserve modal
@@ -1285,9 +1064,6 @@ function applySettings(d){
           localStorage.setItem(APP_CONFIG.AVATAR_KEY,myProf.avatar);
           applyAvatar(myProf.avatar);
         }
-        // Також аватари з окремих полів Sheet
-        if(d.avatarEvgen){const p2=getProfiles();if(!p2['Євген']?.avatar){p2['Євген']=p2['Євген']||{};p2['Євген'].avatar=d.avatarEvgen;localStorage.setItem(APP_CONFIG.PROFILES_KEY,JSON.stringify(p2));}};
-        if(d.avatarMarina){const p2=getProfiles();if(!p2['Марина']?.avatar){p2['Марина']=p2['Марина']||{};p2['Марина'].avatar=d.avatarMarina;localStorage.setItem(APP_CONFIG.PROFILES_KEY,JSON.stringify(p2));}}
       }
     }
   }
@@ -1350,20 +1126,15 @@ function showSyncStatus(status){
 async function syncSettingsToSheet(){
   if(!state.scriptUrl||!state.token){syncState.pendingSettings=true;return;}
   try{
-    const profs=getProfiles();
-    // Включаємо аватари в profiles — Sheet зберігає їх в окремій комірці
     await apiPost({
       action:'updateSettings',
       expCats:getExpCats(),
       incCats:getIncCats(),
       cardsEvgen:getCards('Євген'),
       cardsMarina:getCards('Марина'),
-      profiles:profs,
-      avatarEvgen:profs['Євген']?.avatar||null,
-      avatarMarina:profs['Марина']?.avatar||null,
+      profiles:getProfiles(),
     });
     syncState.pendingSettings=false;
-    localStorage.setItem(APP_CONFIG.LAST_SYNC_KEY,new Date().toISOString());
   }catch(e){syncState.pendingSettings=true;console.warn('Settings sync:',e);}
 }
 async function fetchSettingsFromSheet(){ await fullSync(true); }
