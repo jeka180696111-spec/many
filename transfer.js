@@ -117,6 +117,26 @@ export function openTransferDialog(presets = {}) {
 
         const [fromOwner, fromCard] = fromVal.split('::');
 
+        // ── Перевірка балансу ───────────────────────────────────
+        const ops = state.operations || [];
+        let fromBalance = 0;
+        ops.forEach(o => {
+          if (o.who === fromOwner && o.card === fromCard) {
+            if (o.type === 'Дохід')   fromBalance += (o.amountUah || o.amount || 0);
+            if (o.type === 'Витрата') fromBalance -= (o.amountUah || o.amount || 0);
+          }
+        });
+        // Для UAH порівнюємо напряму, для інших валют — приблизно (без точної конвертації тут)
+        if (cur === 'UAH' && amt > fromBalance) {
+          const { confirmModal } = await import('./modals.js');
+          const newBalance = fromBalance - amt;
+          const ok = await confirmModal(
+            `⚠️ Недостатньо коштів!\n\nНа "${fromCard}" зараз ${fromBalance.toFixed(0)} ₴.\nПісля переказу буде: ${newBalance.toFixed(0)} ₴ (мінус).\n\nВсе одно провести?`,
+            { danger: true, okText: 'Так, у мінус' }
+          );
+          if (!ok) return;
+        }
+
         // Перевіряємо тип призначення
         let toOwner = null, toCard = null, toReserve = false;
         if (toVal === '__reserve__') {
