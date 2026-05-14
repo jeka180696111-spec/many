@@ -5,7 +5,7 @@
 import { FAMILY_MEMBERS, state } from './config.js';
 import { apiGet, apiPost } from './api.js';
 import { getCards, getProfiles, getWalletTypeById } from './storage.js';
-import { esc, fmtMoney, fmtDate, showToast, uid } from './utils.js';
+import { esc, fmtMoney, fmtMoneyWithUah, toUah, fmtDate, showToast, uid } from './utils.js';
 import { openBottomSheet, closeModal } from './modals.js';
 import { openOperationDialog } from './operations.js';
 
@@ -34,21 +34,34 @@ export function renderReservePage() {
     });
   });
 
-  // ── Рахуємо баланс кожного кошелька накопичень ──
+  // ── Рахуємо баланс кожного кошелька накопичень у власній валюті ──
   const ops = state.operations || [];
   function cardBalance(card) {
     let bal = 0;
+    const cardCur = card.currency || 'UAH';
     ops.forEach(o => {
       if (o.who === card.owner && o.card === card.id) {
-        if (o.type === 'Дохід') bal += (o.amountUah || o.amount || 0);
-        if (o.type === 'Витрата') bal -= (o.amountUah || o.amount || 0);
+        const opCur = o.currency || 'UAH';
+        let val = 0;
+        if (opCur === cardCur) {
+          val = o.amount || 0;
+        } else {
+          val = o.amountUah || o.amount || 0;
+          if (cardCur !== 'UAH' && state.fx && state.fx[cardCur]) {
+            const rate = state.fx[cardCur].mid || 1;
+            val = val / rate;
+          }
+        }
+        if (o.type === 'Дохід') bal += val;
+        if (o.type === 'Витрата') bal -= val;
       }
     });
     return bal;
   }
 
   const cardsWithBal = savingsCards.map(c => ({ ...c, balance: cardBalance(c) }));
-  const totalSavings = cardsWithBal.reduce((s, c) => s + c.balance, 0);
+  // Загальний резерв у UAH
+  const totalSavings = cardsWithBal.reduce((s, c) => s + toUah(c.balance, c.currency || 'UAH', state.fx), 0);
 
   // ── Старий резерв (з листа Резерв у таблиці) ──
   const r = state.reserve || {};
@@ -87,9 +100,9 @@ export function renderReservePage() {
                 </div>
                 <div class="dash-wallet-info">
                   <div class="dash-wallet-name">${esc(c.id)}</div>
-                  <div class="dash-wallet-owner">${esc(profiles[c.owner]?.name || c.owner)}</div>
+                  <div class="dash-wallet-owner">${esc(profiles[c.owner]?.name || c.owner)}${c.currency && c.currency !== 'UAH' ? ' · ' + c.currency : ''}</div>
                 </div>
-                <div class="dash-wallet-balance ${c.balance >= 0 ? 'pos' : 'neg'}">${fmtMoney(c.balance, 'UAH')}</div>
+                <div class="dash-wallet-balance ${c.balance >= 0 ? 'pos' : 'neg'}">${fmtMoneyWithUah(c.balance, c.currency || 'UAH', state.fx)}</div>
               </div>
             `).join('')}
           </div>
