@@ -187,9 +187,12 @@ export function openCreateWallet(presetOwner) {
       }
       cards.push({ id: name, icon, bg: color.bg, color: color.color, walletType });
       setCards(cards, ownerFinal);
-      syncSettingsToSheet();
-      showToast('✅ Кошельок додано');
       renderWalletsPage();
+      // Сінк з підтвердженням
+      showToast('💾 Зберігаю...');
+      syncSettingsToSheet()
+        .then(() => showToast('✅ Кошельок збережено на сервер'))
+        .catch(e => showToast('⚠️ Збережено локально, але не на сервер: ' + e.message, 'error'));
     }
   });
 }
@@ -237,16 +240,20 @@ export function openEditWallet(owner, idx) {
         targetCards.push(updated);
         setCards(targetCards, newOwner);
       }
-      syncSettingsToSheet();
-      showToast('✅ Збережено');
       renderWalletsPage();
+      showToast('💾 Зберігаю...');
+      syncSettingsToSheet()
+        .then(() => showToast('✅ Збережено на сервер'))
+        .catch(e => showToast('⚠️ Локально OK, сервер: ' + e.message, 'error'));
     },
     onDelete: () => {
       cards.splice(idx, 1);
       setCards(cards, owner);
-      syncSettingsToSheet();
-      showToast('Кошельок видалено');
       renderWalletsPage();
+      showToast('💾 Видаляю...');
+      syncSettingsToSheet()
+        .then(() => showToast('✅ Кошельок видалено'))
+        .catch(e => showToast('⚠️ Видалено локально, сервер: ' + e.message, 'error'));
     }
   });
 }
