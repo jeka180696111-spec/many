@@ -9,20 +9,20 @@ let fabOpen = false;
 
 // ── Ініціалізація FAB ──────────────────────────────────────
 export function initFAB() {
-  const fab = document.getElementById('fab-main');
+  const fab = document.getElementById('fab-main') || document.getElementById('bn-fab-btn');
   if (!fab) return;
   fab.addEventListener('click', toggleFabMenu);
 
   // Закриття при кліку поза FAB
   document.addEventListener('click', (e) => {
     if (!fabOpen) return;
-    if (!e.target.closest('#fab-main') && !e.target.closest('#fab-menu')) {
+    if (!e.target.closest('#fab-main') && !e.target.closest('#bn-fab-btn') && !e.target.closest('#fab-menu')) {
       closeFabMenu();
     }
   });
 }
 
-function toggleFabMenu() {
+export function toggleFabMenu() {
   if (fabOpen) closeFabMenu();
   else openFabMenu();
 }
