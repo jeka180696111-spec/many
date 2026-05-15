@@ -54,8 +54,8 @@ export function renderGoalsPage() {
   el.querySelector('#add-goal-btn')?.addEventListener('click', () => openGoalDialog());
   el.querySelectorAll('[data-goal-row]').forEach(card => {
     card.addEventListener('click', () => {
-      const row = parseInt(card.dataset.goalRow);
-      const g = goals.find(x => x.row === row);
+      const row = card.dataset.goalRow;
+      const g = goals.find(x => String(x.row) === String(row) || String(x.id) === String(row));
       if (g) openGoalDialog(g);
     });
   });
