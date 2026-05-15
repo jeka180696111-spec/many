@@ -254,6 +254,9 @@
   box-shadow: var(--shadow-lg);
   transition: transform 0.2s;
   flex-shrink: 0;
+  margin-top: -20px;
+  position: relative;
+  z-index: 31;
 }
 .bn-fab.open { transform: rotate(45deg); }
 
