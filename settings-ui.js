@@ -8,6 +8,7 @@ import {
   getWalletTypes, setWalletTypes,
   getFamilyName, setFamilyName,
   getProfiles, setProfiles,
+  getCards,
   getTheme,
 } from './storage.js';
 import { syncSettingsToSheet, pingBackend } from './api.js';
@@ -130,9 +131,22 @@ export function renderSettingsPage() {
       <div class="settings-section">
         <div class="settings-label">Кошельки</div>
         <div class="settings-card">
-          <div class="settings-hint">Усі кошельки можна переглянути та керувати на сторінці «Кошельки».</div>
-          <button class="settings-add-btn" data-go="wallets"><i class="ti ti-wallet"></i> Перейти до кошельків</button>
+          ${FAMILY_MEMBERS.map(m => {
+            const cards = getCards(m);
+            return `
+              <div class="settings-row-sub" style="font-weight:700;padding:10px 0 4px;font-size:13px;">${esc(profiles[m]?.name || m)}</div>
+              <div class="cat-grid" id="wallets-grid-${esc(m)}">
+                ${cards.map((c, idx) => `
+                  <div class="cat-chip" data-wallet-owner="${esc(m)}" data-wallet-idx="${idx}" style="background:${c.bg};color:${c.color}">
+                    <i class="ti ${c.icon}"></i> ${esc(c.id)} ${c.currency && c.currency !== 'UAH' ? '(' + c.currency + ')' : ''}
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }).join('')}
+          <button class="settings-add-btn" id="add-wallet-btn"><i class="ti ti-plus"></i> Додати кошельок</button>
         </div>
+      </div>
       </div>
 
       <!-- Інфо -->
@@ -402,6 +416,19 @@ function bindHandlers(el) {
   el.querySelector('#add-exp-cat-btn')?.addEventListener('click', () => openCatEditor('exp'));
   el.querySelector('#add-inc-cat-btn')?.addEventListener('click', () => openCatEditor('inc'));
   el.querySelector('#add-wallet-type-btn')?.addEventListener('click', () => openTypeEditor());
+
+  // Кошельки — клік для редагування
+  el.querySelectorAll('[data-wallet-owner]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const owner = chip.dataset.walletOwner;
+      const idx = parseInt(chip.dataset.walletIdx);
+      import('./wallets.js').then(m => m.openEditWallet(owner, idx));
+    });
+  });
+  // Додати кошельок
+  el.querySelector('#add-wallet-btn')?.addEventListener('click', () => {
+    import('./wallets.js').then(m => m.openCreateWallet());
+  });
 
   // Навігація
   el.querySelectorAll('[data-go]').forEach(b => {
