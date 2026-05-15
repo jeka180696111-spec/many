@@ -2,7 +2,7 @@
 // SETTINGS UI — сторінка налаштувань
 // ═══════════════════════════════════════════════════════════════
 
-import { FAMILY_MEMBERS, state } from './config.js';
+import { FAMILY_MEMBERS, state, getFamilyMembers, setFamilyMembers, getEmailToMember } from './config.js';
 import {
   getExpCats, setExpCats, getIncCats, setIncCats,
   getWalletTypes, setWalletTypes,
@@ -55,6 +55,26 @@ export function renderSettingsPage() {
             </div>
             <button class="btn-ghost-sm" id="save-family-btn">Зберегти</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Тема -->
+      <div class="settings-section">
+        <div class="settings-label">Учасники сім'ї</div>
+        <div class="settings-card">
+          <div class="settings-hint" style="font-size:12px;padding:0 0 8px;">Імена які використовуються скрізь у додатку. Клікни щоб змінити.</div>
+          <div id="members-list">
+            ${getFamilyMembers().map((m, i) => `
+              <div class="settings-row">
+                <div class="settings-row-icon" style="background:var(--c-accent-soft);color:var(--c-accent)"><b>${m[0]}</b></div>
+                <div class="settings-row-info">
+                  <input class="settings-row-input member-name-input" data-member-idx="${i}" value="${esc(m)}" placeholder="Ім'я">
+                </div>
+                <div class="settings-row-sub" style="font-size:11px;color:var(--c-text-3)">${esc((Object.entries(getEmailToMember()).find(([e, n]) => n === m) || [])[0] || 'не прив\'язано')}</div>
+              </div>
+            `).join('')}
+          </div>
+          <button class="settings-add-btn" id="save-members-btn"><i class="ti ti-check"></i> Зберегти імена</button>
         </div>
       </div>
 
@@ -306,6 +326,24 @@ function bindHandlers(el) {
   el.querySelector('#signout-btn')?.addEventListener('click', async () => {
     const ok = await confirmModal('Точно вийти?', { danger: true, okText: 'Вийти' });
     if (ok) signOut();
+  });
+
+  // Зберегти імена учасників
+  el.querySelector('#save-members-btn')?.addEventListener('click', async () => {
+    const inputs = el.querySelectorAll('.member-name-input');
+    const names = [];
+    inputs.forEach(inp => {
+      const name = inp.value.trim();
+      if (name) names.push(name);
+    });
+    if (names.length === 0) { showToast('Додай хоча б одне ім\'я', 'error'); return; }
+    setFamilyMembers(names);
+    showToast('✅ Імена збережено');
+    try {
+      const { syncSettingsToSheet } = await import('./api.js');
+      await syncSettingsToSheet();
+    } catch(e) {}
+    renderSettingsPage();
   });
 
   // Sync
