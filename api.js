@@ -174,7 +174,8 @@ async function getReserve() {
 // ── Цілі ─────────────────────────────────────────────────────
 async function getGoals() {
   const snapshot = await familyRef().collection('goals').get();
-  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const goals = snapshot.docs.map(doc => ({ id: doc.id, row: doc.id, ...doc.data() }));
+  return { goals };
 }
 
 // ── Перекази ─────────────────────────────────────────────────
@@ -235,6 +236,7 @@ export async function apiPost(body) {
     case 'updateSettings':  return updateSettings(body);
     case 'addGoal':         return addGoal(body);
     case 'updateGoal':      return updateGoal(body);
+    case 'deleteGoal':      return deleteGoal(body);
     default:
       throw new Error('Unknown action: ' + body.action);
   }
@@ -414,7 +416,8 @@ async function addGoal(body) {
 }
 
 async function updateGoal(body) {
-  if (!body.id) throw new Error('Goal id required');
+  const id = body.row || body.id;
+  if (!id) throw new Error('Goal id required');
   const updates = {};
   if (body.name !== undefined) updates.name = body.name;
   if (body.target !== undefined) updates.target = Number(body.target);
@@ -422,7 +425,15 @@ async function updateGoal(body) {
   if (body.deadline !== undefined) updates.deadline = body.deadline;
   updates.updatedAt = new Date().toISOString();
 
-  await familyRef().collection('goals').doc(body.id).update(updates);
+  await familyRef().collection('goals').doc(id).update(updates);
+  return { ok: true };
+}
+
+async function deleteGoal(body) {
+  const id = body.row || body.id;
+  if (!id) throw new Error('Goal id required');
+  await familyRef().collection('goals').doc(id).delete();
+  log('goal deleted:', id);
   return { ok: true };
 }
 
