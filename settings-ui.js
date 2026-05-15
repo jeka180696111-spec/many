@@ -135,10 +135,11 @@ export function renderSettingsPage() {
             const cards = getCards(m);
             return `
               <div class="settings-row-sub" style="font-weight:700;padding:10px 0 4px;font-size:13px;">${esc(profiles[m]?.name || m)}</div>
-              <div class="cat-grid" id="wallets-grid-${esc(m)}">
+              <div class="cat-grid">
                 ${cards.map((c, idx) => `
-                  <div class="cat-chip" data-wallet-owner="${esc(m)}" data-wallet-idx="${idx}" style="background:${c.bg};color:${c.color}">
-                    <i class="ti ${c.icon}"></i> ${esc(c.id)} ${c.currency && c.currency !== 'UAH' ? '(' + c.currency + ')' : ''}
+                  <div class="cat-item" data-wallet-owner="${esc(m)}" data-wallet-idx="${idx}">
+                    <div class="cat-icon" style="background:${c.bg}"><i class="ti ${c.icon}" style="color:${c.color}"></i></div>
+                    <div class="cat-name">${esc(c.id)}${c.currency && c.currency !== 'UAH' ? '<br><small>' + c.currency + '</small>' : ''}</div>
                   </div>
                 `).join('')}
               </div>
