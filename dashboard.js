@@ -153,30 +153,36 @@ export function renderDashboard() {
 
 // ── Баланс з розділенням: вільні vs накопичення ──────────────
 function calcBalanceSplit(viewAs) {
-  const ops = state.operations || [];
   let freeBalance = 0;
   let savingsBalance = 0;
 
-  const savingsCards = new Set();
-  const creditCards = new Set();
   FAMILY_MEMBERS.forEach(m => {
+    if (viewAs && m !== viewAs) return;
     getCards(m).forEach(c => {
       const wt = getWalletTypeById(c.walletType);
-      if (wt && wt.id === 'savings') savingsCards.add(`${m}::${c.id}`);
-      if (Number(c.creditLimit) > 0) creditCards.add(`${m}::${c.id}`);
-    });
-  });
+      const isSavings = wt && wt.id === 'savings';
+      const isCredit = Number(c.creditLimit) > 0;
+      if (isCredit) return; // кредитки рахуємо окремо через calcCreditAvailable
 
-  ops.forEach(o => {
-    if (o.category === 'Переказ') return;
-    if (viewAs && o.who !== viewAs) return;
-    const amt = o.amountUah || o.amount || 0;
-    const key = `${o.who}::${o.card}`;
-    const isSavings = savingsCards.has(key);
-    const isCredit = creditCards.has(key);
-    const val = o.type === 'Дохід' ? amt : -amt;
-    if (isSavings) savingsBalance += val;
-    else if (!isCredit) freeBalance += val;
+      // Рахуємо баланс картки так само як renderWalletsBlock
+      let bal = 0;
+      const cardCur = c.currency || 'UAH';
+      (state.operations || []).forEach(o => {
+        if (o.category === 'Переказ') return;
+        if (o.who !== m || o.card !== c.id) return;
+        const opCur = o.currency || 'UAH';
+        let val = opCur === cardCur ? (o.amount || 0) : (o.amountUah || o.amount || 0);
+        if (opCur !== cardCur && cardCur !== 'UAH' && state.fx?.[cardCur]) {
+          val = val / (state.fx[cardCur].mid || 1);
+        }
+        if (o.type === 'Дохід') bal += val;
+        if (o.type === 'Витрата') bal -= val;
+      });
+
+      const balUah = cardCur === 'UAH' ? bal : bal * (state.fx?.[cardCur]?.mid || 1);
+      if (isSavings) savingsBalance += balUah;
+      else freeBalance += balUah;
+    });
   });
 
   return { freeBalance: Math.round(freeBalance), savingsBalance: Math.round(savingsBalance) };
