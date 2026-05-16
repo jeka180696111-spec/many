@@ -709,15 +709,20 @@
 .settings-row-name { font-size: 14px; font-weight: 600; }
 .settings-row-sub { font-size: 12px; color: var(--c-text-3); margin-top: 2px; }
 .settings-row-input {
-  width: 100%;
-  margin-top: 4px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
   background: var(--c-bg-3);
-  font-size: 13px;
-  border: 1px solid transparent;
+  border: 1.5px solid var(--c-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--c-text);
+  transition: border-color .15s;
+  width: 100%;
 }
-.settings-row-input:focus { border-color: var(--c-accent); }
+.settings-row-input:focus {
+  border-color: var(--c-accent);
+  outline: none;
+  background: var(--c-bg-2);
+}
 .url-preview { font-family: monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .settings-hint {

@@ -109,11 +109,13 @@
 /* ── CARDS ──────────────────────────────────────────────────── */
 .dash-card {
   background: var(--c-card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: 20px;
-  border: 1px solid var(--c-border);
+  border-radius: 16px;
+  border: .5px solid var(--c-border);
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: box-shadow .2s;
 }
+.dash-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
 .dash-card-head {
   display: flex;
   align-items: center;
@@ -378,6 +380,23 @@
   flex-shrink: 0;
 }
 .modal-text { font-size: 14px; color: var(--c-text-2); line-height: 1.5; }
+
+/* ── MODAL / SETTINGS INPUTS ────────────────────────────────── */
+.modal-input, .settings-row-input {
+  background: var(--c-bg-3);
+  border: 1.5px solid var(--c-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--c-text);
+  transition: border-color .15s;
+  width: 100%;
+}
+.modal-input:focus, .settings-row-input:focus {
+  border-color: var(--c-accent);
+  outline: none;
+  background: var(--c-bg-2);
+}
 
 /* ── ICON PICKER ────────────────────────────────────────────── */
 .ip-label {

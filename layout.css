@@ -237,7 +237,7 @@
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 20px;
 }
-.page-title { font-size: 24px; font-weight: 700; }
+.page-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
 
 /* ── BOTTOM NAV (mobile) ────────────────────────────────────── */
 .bottom-nav {
