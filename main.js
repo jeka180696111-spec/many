@@ -22,6 +22,9 @@ import { renderAnalyticsPage, loadAnalytics } from './analytics.js';
 import { renderReservePage, loadReserve } from './reserve.js';
 import { renderGoalsPage, loadGoals } from './goals.js';
 import { renderSettingsPage } from './settings-ui.js';
+// ── НОВІ МОДУЛІ ─────────────────────────────────────────────
+import { renderRecurringPage, loadRecurringPayments } from './recurring-payments.js';
+import { renderAIReportsPage } from './ai-reports.js';
 
 const PAGE_TITLES = {
   dashboard: 'Головна',
@@ -30,6 +33,8 @@ const PAGE_TITLES = {
   analytics: 'Аналіз',
   reserve: 'Накопичення',
   goals: 'Цілі',
+  recurring: 'Платежі',
+  'ai-reports': 'AI Аналітика',
   settings: 'Налаштування',
 };
 
@@ -60,6 +65,8 @@ export function navigateTo(page) {
     case 'analytics':   renderAnalyticsPage(); break;
     case 'reserve':     renderReservePage(); break;
     case 'goals':       renderGoalsPage(); break;
+    case 'recurring':   renderRecurringPage(); break;
+    case 'ai-reports':  renderAIReportsPage(); break;
     case 'settings':    renderSettingsPage(); break;
   }
   loadPageData(page);
@@ -82,6 +89,9 @@ function loadPageData(page) {
     case 'goals':
       if (!state.goals.length) loadGoals();
       break;
+    case 'recurring':
+      if (!state.recurringPayments) loadRecurringPayments().then(() => renderRecurringPage());
+      break;
   }
 }
 
@@ -99,6 +109,9 @@ async function fullSync() {
       loadDashboard(),
       loadOperations(),
     ]);
+
+    // 4. Обов'язкові платежі (для дашборду)
+    loadRecurringPayments();
 
     log('full sync OK');
   } catch (e) {
@@ -160,7 +173,9 @@ function renderSidebar() {
       <div class="sb-section-label">Фінанси</div>
       <a class="sb-item" data-nav-page="reserve"><i class="ti ti-coins"></i> Накопичення</a>
       <a class="sb-item" data-nav-page="goals"><i class="ti ti-target"></i> Цілі</a>
+      <a class="sb-item" data-nav-page="recurring"><i class="ti ti-calendar-repeat"></i> Платежі</a>
       <div class="sb-section-label">Система</div>
+      <a class="sb-item" data-nav-page="ai-reports"><i class="ti ti-sparkles"></i> AI Аналітика</a>
       <a class="sb-item" data-nav-page="settings"><i class="ti ti-settings"></i> Налаштування</a>
     </nav>
   `;
@@ -289,7 +304,6 @@ function renderBottomNav() {
       navigateTo(a.dataset.navPage);
     });
   });
-  // FAB ініціалізується в initFAB(), тут не додаємо listener
 }
 
 // ── Sidebar mobile ──────────────────────────────────────────
@@ -337,7 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Firebase Auth — слухаємо стан входу
   initAuth((user) => {
-    // Юзер увійшов — показуємо додаток
     const loginScreen = document.getElementById('login-screen');
     const appRoot = document.getElementById('app-root');
     if (loginScreen) loginScreen.style.display = 'none';
@@ -345,7 +358,6 @@ document.addEventListener('DOMContentLoaded', () => {
     bootApp();
   });
 
-  // Кнопка Google Sign In (на екрані логіну)
   const signInBtn = document.getElementById('google-signin-btn');
   if (signInBtn) {
     signInBtn.addEventListener('click', () => signInWithGoogle());
