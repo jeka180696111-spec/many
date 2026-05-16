@@ -4,7 +4,7 @@
 
 import { state, FAMILY_MEMBERS } from './config.js';
 import { fmtMoney, esc, showToast } from './utils.js';
-import { getCards, getProfiles, getWalletTypeById } from './storage.js';
+import { getCards, getProfiles, getWalletTypeById, getViewAsMember } from './storage.js';
 import { getCreditCards } from './credit-cards.js';
 import { getPaymentReminders } from './recurring-payments.js';
 
@@ -94,8 +94,9 @@ export function renderAIReportsPage() {
   if (!el) return;
 
   const d = state.dashboard || {};
-  const inc = d.totalIncome || 0;
-  const exp = d.totalExpense || 0;
+  const viewAs = getViewAsMember();
+  const inc = viewAs ? (d.byMember?.[viewAs]?.income || 0) : (d.totalIncome || 0);
+  const exp = viewAs ? (d.byMember?.[viewAs]?.expense || 0) : (d.totalExpense || 0);
   const sav = inc > 0 ? Math.round((inc - exp) / inc * 100) : 0;
   const month = d.month ? new Date(d.month + '-01').toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' }) : '';
 

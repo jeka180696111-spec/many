@@ -48,18 +48,20 @@ export function renderAnalyticsPage() {
     periodLabel = String(now.getFullYear());
   }
 
-  // Фільтр по viewAs (як на дашборді)
+  // Фільтр по viewAs
   let totalIncome = d.totalIncome || 0;
   let totalExpense = d.totalExpense || 0;
-  if (viewAs && d.byMember && d.byMember[viewAs]) {
-    totalIncome = d.byMember[viewAs].income || 0;
-    totalExpense = d.byMember[viewAs].expense || 0;
+  let byCat = d.byCategory || {};
+  let byDay = d.byDay || {};
+  if (viewAs) {
+    totalIncome = d.byMember?.[viewAs]?.income || 0;
+    totalExpense = d.byMember?.[viewAs]?.expense || 0;
+    byCat = d.byCategoryMember?.[viewAs] || {};
+    byDay = d.byDayMember?.[viewAs] || {};
   }
   const balance = totalIncome - totalExpense;
   const savRate = totalIncome > 0 ? Math.round((totalIncome - totalExpense) / totalIncome * 100) : 0;
 
-  const byCat = d.byCategory || {};
-  const byDay = d.byDay || {};
   const sorted = Object.entries(byCat).sort((a, b) => b[1] - a[1]);
 
   el.innerHTML = `

@@ -764,6 +764,57 @@ async function handleCommand(cmd, chatId, userId, userName, who, res) {
   }
 }
 
+// ── AI Чат ───────────────────────────────────────────────────
+function isConversational(text) {
+  if (text.length < 4) return false;
+  if (text.includes('?') || text.includes('?')) return true;
+  const triggers = ['як', 'що', 'де', 'чому', 'скільки', 'коли', 'чи', 'поради', 'порада', 'допоможи', 'розкажи', 'поясни', 'аналіз', 'звіт', 'прогноз', 'розбір', 'критикуй', 'оціни', 'думаєш'];
+  const lower = text.toLowerCase();
+  return triggers.some(t => lower.startsWith(t) || lower.includes(' ' + t));
+}
+
+async function handleAIChat(chatId, userText, who, res) {
+  try {
+    // Збираємо контекст
+    const [wallets, recentOps] = await Promise.all([
+      getWalletBalances(),
+      getLastOps(10),
+    ]);
+    const totalUah = wallets.reduce((s, w) => s + w.balanceUah, 0);
+    const recentExp = recentOps.filter(o => o.type === 'Витрата').slice(0, 5)
+      .map(o => `${o.desc || o.category} ${o.amount}₴`).join(', ');
+    const context = `Користувач: ${who}. Загальний баланс: ${fmtMoney(totalUah)}. Останні витрати: ${recentExp || 'немає'}.`;
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      await sendMessage(chatId, '❌ AI ключ не налаштований.');
+      return res.status(200).json({ ok: true });
+    }
+
+    const systemPrompt = `Ти — саркастичний фінансовий радник родини Кіосе. Стиль: дотепний, їдкий, але з турботою.
+Правила: відповідай УКРАЇНСЬКОЮ, коротко (2-4 речення), використовуй конкретні цифри якщо є, емодзі помірно.
+${context}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 400,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userText }],
+      }),
+    });
+
+    const data = await response.json();
+    const reply = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || 'Щось пішло не так 🤷';
+    await sendMessage(chatId, reply);
+  } catch (e) {
+    await sendMessage(chatId, '❌ Помилка AI: ' + e.message);
+  }
+  return res.status(200).json({ ok: true });
+}
+
 // ═══════════════════════════════════════════════════════════════
 // WEBHOOK HANDLER
 // ═══════════════════════════════════════════════════════════════
@@ -847,8 +898,12 @@ module.exports = async function handler(req, res) {
     // Парсимо операцію і показуємо для підтвердження
     const parsed = parseMessage(text);
     if (!parsed) {
+      // Якщо схоже на питання — відповідає AI
+      if (isConversational(text)) {
+        return handleAIChat(chatId, text, who, res);
+      }
       await sendMessage(chatId,
-        `🤔 Не зрозумів. Напиши суму і опис:\n<code>каву 85</code>\n<code>зп 40000</code>`
+        `🤔 Не зрозумів. Напиши суму і опис:\n<code>каву 85</code>\n<code>зп 40000</code>\n\nАбо постав питання — я відповім 😏`
       );
       return res.status(200).json({ ok: true });
     }

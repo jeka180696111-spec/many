@@ -4,7 +4,7 @@
 
 import { FAMILY_MEMBERS, state } from './config.js';
 import { apiGet, apiPost } from './api.js';
-import { getCards, getProfiles, getWalletTypeById } from './storage.js';
+import { getCards, getProfiles, getWalletTypeById, getViewAsMember } from './storage.js';
 import { esc, fmtMoney, fmtMoneyWithUah, toUah, fmtDate, showToast, uid } from './utils.js';
 import { openBottomSheet, closeModal } from './modals.js';
 import { openOperationDialog } from './operations.js';
@@ -24,8 +24,10 @@ export function renderReservePage() {
 
   // ── Збираємо кошельки типу "savings" по всіх власниках ──
   const profiles = getProfiles();
+  const viewAs = getViewAsMember();
   const savingsCards = [];
   FAMILY_MEMBERS.forEach(owner => {
+    if (viewAs && owner !== viewAs) return;
     getCards(owner).forEach(c => {
       const wtype = getWalletTypeById(c.walletType);
       if (wtype && wtype.id === 'savings') {

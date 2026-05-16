@@ -154,6 +154,33 @@
 .wallet-credit-label { font-size: 10px; color: var(--c-text-3); white-space: nowrap; font-weight: 600; }
 .wallet-credit-label.used { color: var(--c-red); }
 
+/* ── AI CHAT ────────────────────────────────────────────────── */
+.chat-page-inner { display: flex; flex-direction: column; height: 100%; max-height: calc(100vh - 60px); }
+.chat-hints { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.chat-hint-btn { font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 20px; background: var(--c-bg-3); border: 1px solid var(--c-border); color: var(--c-text-2); cursor: pointer; transition: .15s; white-space: nowrap; }
+.chat-hint-btn:hover { border-color: var(--c-accent); color: var(--c-accent); }
+.chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 0 12px; min-height: 0; }
+.chat-bubble { max-width: 85%; }
+.chat-bubble.user { align-self: flex-end; }
+.chat-bubble.bot { align-self: flex-start; }
+.chat-bubble-text {
+  padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.55;
+}
+.chat-bubble.user .chat-bubble-text { background: var(--c-accent); color: #fff; border-bottom-right-radius: 4px; }
+.chat-bubble.bot .chat-bubble-text { background: var(--c-card); border: .5px solid var(--c-border); border-bottom-left-radius: 4px; }
+.chat-bubble.error .chat-bubble-text { background: #fce4ec; color: #c62828; }
+.chat-input-row { display: flex; gap: 8px; padding-top: 10px; border-top: .5px solid var(--c-border); margin-top: auto; }
+.chat-input { flex: 1; padding: 12px 16px; border-radius: 24px; border: 1px solid var(--c-border); background: var(--c-bg-3); font-size: 14px; color: var(--c-text); outline: none; transition: .2s; }
+.chat-input:focus { border-color: var(--c-accent); }
+.chat-send-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--c-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; transition: .15s; }
+.chat-send-btn:hover { opacity: .85; }
+.chat-send-btn:disabled { opacity: .4; }
+.chat-typing { display: flex; gap: 4px; align-items: center; height: 18px; }
+.chat-typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--c-text-3); animation: chatDot 1.2s infinite; }
+.chat-typing span:nth-child(2) { animation-delay: .2s; }
+.chat-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes chatDot { 0%,60%,100% { opacity:.3; transform: scale(.8); } 30% { opacity:1; transform: scale(1); } }
+
 /* ── EMPTY STATE ────────────────────────────────────────────── */
 .empty-state { display: flex; flex-direction: column; align-items: center; padding: 48px 20px; text-align: center; }
 

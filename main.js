@@ -25,6 +25,7 @@ import { renderSettingsPage } from './settings-ui.js';
 // ── НОВІ МОДУЛІ ─────────────────────────────────────────────
 import { renderRecurringPage, loadRecurringPayments } from './recurring-payments.js';
 import { renderAIReportsPage } from './ai-reports.js';
+import { renderAIChatPage } from './ai-chat.js';
 
 const PAGE_TITLES = {
   dashboard: 'Головна',
@@ -35,6 +36,7 @@ const PAGE_TITLES = {
   goals: 'Цілі',
   recurring: 'Платежі',
   'ai-reports': 'AI Аналітика',
+  'ai-chat': 'AI Чат',
   settings: 'Налаштування',
 };
 
@@ -67,6 +69,7 @@ export function navigateTo(page) {
     case 'goals':       renderGoalsPage(); break;
     case 'recurring':   renderRecurringPage(); break;
     case 'ai-reports':  renderAIReportsPage(); break;
+    case 'ai-chat':     renderAIChatPage(); break;
     case 'settings':    renderSettingsPage(); break;
   }
   loadPageData(page);
@@ -176,6 +179,7 @@ function renderSidebar() {
       <a class="sb-item" data-nav-page="recurring"><i class="ti ti-calendar-repeat"></i> Платежі</a>
       <div class="sb-section-label">Система</div>
       <a class="sb-item" data-nav-page="ai-reports"><i class="ti ti-sparkles"></i> AI Аналітика</a>
+      <a class="sb-item" data-nav-page="ai-chat"><i class="ti ti-message-chatbot"></i> AI Чат</a>
       <a class="sb-item" data-nav-page="settings"><i class="ti ti-settings"></i> Налаштування</a>
     </nav>
   `;
