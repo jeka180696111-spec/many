@@ -3,11 +3,3 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ]
 }
-{
-  "crons": [
-    {
-      "path": "/api/telegram-remind",
-      "schedule": "0 9 * * *"
-    }
-  ]
-}
