@@ -761,7 +761,7 @@ function renderSubPageBody(key) {
         </div>
 
         <div class="settings-card" style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-text-3);margin-bottom:10px">Що входить до Pro</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-text-3);margin-bottom:10px;padding-left:4px">Що входить до Pro</div>
           ${[
             ['ti-robot',          '#DBEAFE', '#2563EB', 'AI-аналітика (Фінн)',    'Персональний фінансовий радник на базі Claude AI'],
             ['ti-users',          '#FEF3C7', '#D97706', 'Необмежена родина',       'Додавайте скількох завгодно членів родини'],
@@ -783,7 +783,7 @@ function renderSubPageBody(key) {
         </div>
 
         <div class="settings-card" style="margin-bottom:12px">
-          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-text-3);margin-bottom:10px">Поточний план</div>
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-text-3);margin-bottom:10px;padding-left:4px">Поточний план</div>
           <div style="display:flex;align-items:center;gap:12px;padding:10px 0">
             <div style="width:40px;height:40px;border-radius:12px;background:var(--c-bg-3);color:var(--c-text-3);display:flex;align-items:center;justify-content:center">
               <i class="ti ti-package"></i>
