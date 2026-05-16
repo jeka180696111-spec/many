@@ -214,13 +214,14 @@ export function openCreateWallet(presetOwner) {
     extraFields: ownerSelect,
     showTypes: true,
     showCurrency: true,
+    showCreditLimit: true,
     typesList: types,
     selectedType: types[0]?.id,
     selectedCurrency: 'UAH',
     selectedIcon: types[0]?.icon || 'ti-wallet',
     selectedColor: { bg: types[0]?.bg || '#E6F1FB', color: types[0]?.color || '#0C447C' },
     isEdit: false,
-    onSave: ({ name, icon, color, walletType, currency, owner }) => {
+    onSave: ({ name, icon, color, walletType, currency, creditLimit, owner }) => {
       const ownerFinal = owner && FAMILY_MEMBERS.includes(owner) ? owner : selOwner;
       const cards = getCards(ownerFinal);
       // Перевірка унікальності
@@ -228,7 +229,9 @@ export function openCreateWallet(presetOwner) {
         showToast('Кошельок з такою назвою вже існує', 'error');
         return;
       }
-      cards.push({ id: name, icon, bg: color.bg, color: color.color, walletType, currency: currency || 'UAH' });
+      const card = { id: name, icon, bg: color.bg, color: color.color, walletType, currency: currency || 'UAH' };
+      if (creditLimit > 0) card.creditLimit = creditLimit;
+      cards.push(card);
       setCards(cards, ownerFinal);
       renderWalletsPage();
       showToast('💾 Зберігаю...');
@@ -264,14 +267,17 @@ export function openEditWallet(owner, idx) {
     extraFields: ownerSelect,
     showTypes: true,
     showCurrency: true,
+    showCreditLimit: true,
     typesList: types,
     selectedType: card.walletType || types[0]?.id,
     selectedCurrency: card.currency || 'UAH',
+    selectedCreditLimit: card.creditLimit || 0,
     selectedIcon: card.icon,
     selectedColor: { bg: card.bg, color: card.color },
     isEdit: true,
-    onSave: ({ name, icon, color, walletType, currency, owner: newOwner }) => {
+    onSave: ({ name, icon, color, walletType, currency, creditLimit, owner: newOwner }) => {
       const updated = { id: name, icon, bg: color.bg, color: color.color, walletType, currency: currency || 'UAH' };
+      if (creditLimit > 0) updated.creditLimit = creditLimit;
       if (newOwner === owner || !newOwner) {
         cards[idx] = updated;
         setCards(cards, owner);
