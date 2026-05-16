@@ -134,12 +134,23 @@ async function getDashboard(period) {
     if (o.type === 'Дохід') byDayIncome[day] = (byDayIncome[day] || 0) + (o.amountUah || o.amount || 0);
   });
 
-  // Останні 8
-  const allOpsSnapshot = await familyRef().collection('operations')
-    .orderBy('date', 'desc')
-    .limit(8)
-    .get();
-  const recent = allOpsSnapshot.docs.map(doc => ({ id: doc.id, row: doc.id, ...doc.data() }));
+  // Останні 8 + всі операції по картках (для реального залишку кредиток)
+  const [recentSnap, allCardSnap] = await Promise.all([
+    familyRef().collection('operations').orderBy('date', 'desc').limit(8).get(),
+    familyRef().collection('operations').get(),
+  ]);
+  const recent = recentSnap.docs.map(doc => ({ id: doc.id, row: doc.id, ...doc.data() }));
+
+  const cardBalances = {};
+  allCardSnap.docs.forEach(doc => {
+    const o = doc.data();
+    if (o.category === 'Переказ' || !o.card) return;
+    const key = `${o.who || ''}:${o.card}`;
+    if (!cardBalances[key]) cardBalances[key] = { income: 0, expense: 0 };
+    const amt = o.amountUah || o.amount || 0;
+    if (o.type === 'Дохід') cardBalances[key].income += amt;
+    if (o.type === 'Витрата') cardBalances[key].expense += amt;
+  });
 
   const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -149,7 +160,7 @@ async function getDashboard(period) {
     totalExpense: Math.round(totalExpense),
     balance: Math.round(totalIncome - totalExpense),
     savingsRate: totalIncome > 0 ? (totalIncome - totalExpense) / totalIncome * 100 : 0,
-    byMember, byCategory, byDay, byDayIncome, recent,
+    byMember, byCategory, byDay, byDayIncome, recent, cardBalances,
     fx: state.fx || {},
   };
 }

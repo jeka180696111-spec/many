@@ -35,6 +35,11 @@ export function getCreditCards(viewAs) {
 }
 
 function calcCreditUsed(member, cardId) {
+  const key = `${member}:${cardId}`;
+  const b = state.dashboard?.cardBalances?.[key];
+  if (b) return Math.max(0, b.expense - b.income);
+
+  // Fallback to current month operations if dashboard not loaded yet
   let used = 0;
   (state.operations || []).forEach(op => {
     if (op.who !== member || op.card !== cardId) return;
