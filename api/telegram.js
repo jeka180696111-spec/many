@@ -1,6 +1,6 @@
 // /api/telegram.js — Telegram Bot Webhook (Vercel Serverless Function)
 
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -947,7 +947,7 @@ ${context}`;
 // WEBHOOK HANDLER
 // ═══════════════════════════════════════════════════════════════
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(200).json({ ok: true, message: 'Telegram webhook endpoint' });
   }
