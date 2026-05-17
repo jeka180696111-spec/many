@@ -633,11 +633,11 @@ function renderSubPageBody(key) {
               <i class="ti ti-brand-telegram"></i>
             </div>
             <div>
-              <div style="font-size:16px;font-weight:700;margin-bottom:2px">Finance Helper Bot</div>
+              <div style="font-size:16px;font-weight:700;margin-bottom:2px">Financial Family Assistant</div>
               <div style="font-size:13px;color:var(--c-text-3)">Ваш фінансовий асистент у Telegram</div>
             </div>
           </div>
-          <a href="https://t.me/FinanceHelperBot" target="_blank" rel="noopener"
+          <a href="https://t.me/Financial_Family_Assistant_Bot" target="_blank" rel="noopener"
             style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:12px;background:#0284C7;color:#fff;border-radius:var(--radius);font-size:14px;font-weight:700;text-decoration:none;margin-bottom:14px">
             <i class="ti ti-brand-telegram" style="font-size:18px"></i> Відкрити бота
           </a>
