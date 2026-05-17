@@ -89,13 +89,13 @@ export const DEFAULT_INC_CATS = [
   { id: 'Інше', icon: 'ti-dots', bg: '#F0F0F0', color: '#555' },
 ];
 
-// Дефолтні кошельки
+// Дефолтні гаманці
 export const DEFAULT_CARDS = [
   { id: 'Готівка', icon: 'ti-cash', bg: '#EAF3DE', color: '#27500A', walletType: 'cash', currency: 'UAH' },
   { id: 'Картка', icon: 'ti-credit-card', bg: '#E6F1FB', color: '#185FA5', walletType: 'card', currency: 'UAH' },
 ];
 
-// Типи кошельків
+// Типи гаманців
 export const DEFAULT_WALLET_TYPES = [
   { id: 'cash',    name: 'Готівка',      icon: 'ti-cash',            bg: '#EAF3DE', color: '#27500A' },
   { id: 'card',    name: 'Картка',       icon: 'ti-credit-card',     bg: '#E6F1FB', color: '#185FA5' },

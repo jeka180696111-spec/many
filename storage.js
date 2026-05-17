@@ -81,7 +81,7 @@ export function setIncCats(cats) {
   writeJson(APP_CONFIG.INC_CATS_KEY, cats);
 }
 
-// ── Авто-визначення валюти за назвою кошелька ───────────────
+// ── Авто-визначення валюти за назвою гаманця ───────────────
 function detectCurrency(name) {
   if (!name) return 'UAH';
   const n = String(name).toLowerCase();
@@ -90,7 +90,7 @@ function detectCurrency(name) {
   return 'UAH';
 }
 
-// ── Картки/кошельки по членах сім'ї ─────────────────────────
+// ── Картки/гаманці по членах сім'ї ─────────────────────────
 export function getCards(member) {
   if (!member) {
     const all = [];
@@ -103,7 +103,7 @@ export function getCards(member) {
   const key = APP_CONFIG.CARDS_KEY + '_' + member;
   const v = readJson(key, null);
   const list = v === null ? DEFAULT_CARDS : (Array.isArray(v) ? v : DEFAULT_CARDS);
-  // Авто-додаємо currency якщо відсутнє (для старих кошельків)
+  // Авто-додаємо currency якщо відсутнє (для старих гаманців)
   return list.map(c => ({
     ...c,
     currency: c.currency || detectCurrency(c.id),
@@ -260,8 +260,8 @@ export function setDashPeriod(p) {
   localStorage.setItem('budget_dash_period', p);
 }
 
-// ── Які кошельки показувати на дашборді ─────────────────────
-// Зберігаємо масив ID кошельків у форматі "owner::cardId"
+// ── Які гаманці показувати на дашборді ─────────────────────
+// Зберігаємо масив ID гаманців у форматі "owner::cardId"
 // Якщо null/[] — показуємо всі (поведінка за замовчуванням)
 export function getVisibleWallets() {
   try {

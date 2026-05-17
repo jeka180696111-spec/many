@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// WALLETS — єдина сторінка "Кошельки" з фільтрами
+// WALLETS — єдина сторінка "Гаманці" з фільтрами
 // ═══════════════════════════════════════════════════════════════
 
 import { FAMILY_MEMBERS, state } from './config.js';
@@ -89,7 +89,7 @@ export function renderWalletsPage() {
       <div class="wallets-hero">
         <div class="wallets-hero-label">${ownerFilter === 'all' ? 'Усі рахунки' : 'Рахунки: ' + esc(profiles[ownerFilter]?.name || ownerFilter)}</div>
         <div class="wallets-hero-balance">${fmtMoney(totalBalanceUah, 'UAH')}</div>
-        <div class="wallets-hero-meta">${totalCount} ${totalCount === 1 ? 'кошельок' : 'кошельків'}</div>
+        <div class="wallets-hero-meta">${totalCount} ${totalCount === 1 ? 'гаманець' : 'гаманців'}</div>
       </div>
 
       <div class="ops-filter-bar wallets-filter-bar" id="wallets-filter-bar">
@@ -109,8 +109,8 @@ export function renderWalletsPage() {
         ${filtered.length === 0 ? `
           <div class="empty-state">
             <div class="empty-state-illustration">💳</div>
-            <div class="empty-state-title">Немає кошельків</div>
-            <div class="empty-state-text">Додай перший кошельок — готівка, картка або рахунок</div>
+            <div class="empty-state-title">Немає гаманців</div>
+            <div class="empty-state-text">Додай перший гаманець — готівка, картка або рахунок</div>
           </div>
         ` : filtered.map(c => {
           const bal = cardBalance(c);
@@ -243,7 +243,7 @@ export function renderWalletsPage() {
     }, { capture: true });
   }
 
-  // Клік на кошельок — редагування
+  // Клік на гаманець — редагування
   el.querySelectorAll('.wallet-row').forEach(row => {
     row.addEventListener('click', () => {
       const owner = row.dataset.owner;
@@ -253,7 +253,7 @@ export function renderWalletsPage() {
   });
 }
 
-// ── Створення кошелька ──────────────────────────────────────
+// ── Створення гаманця ──────────────────────────────────────
 export function openCreateWallet(presetOwner) {
   const types = getWalletTypes();
   const profiles = getProfiles();
@@ -275,7 +275,7 @@ export function openCreateWallet(presetOwner) {
   `;
 
   openIconPicker({
-    title: 'Новий кошельок',
+    title: 'Новий гаманець',
     nameLabel: 'Назва',
     namePlaceholder: 'Наприклад: Монобанк USD',
     extraFields: ownerSelect,
@@ -293,7 +293,7 @@ export function openCreateWallet(presetOwner) {
       const cards = getCards(ownerFinal);
       // Перевірка унікальності
       if (cards.find(c => c.id === name)) {
-        showToast('Кошельок з такою назвою вже існує', 'error');
+        showToast('Гаманець з такою назвою вже існує', 'error');
         return;
       }
       const card = { id: name, icon, bg: color.bg, color: color.color, walletType, currency: currency || 'UAH' };
@@ -303,7 +303,7 @@ export function openCreateWallet(presetOwner) {
       renderWalletsPage();
       showToast('💾 Зберігаю...');
       syncSettingsToSheet()
-        .then(() => showToast('✅ Кошельок збережено на сервер'))
+        .then(() => showToast('✅ Гаманець збережено на сервер'))
         .catch(e => showToast('⚠️ Збережено локально, але не на сервер: ' + e.message, 'error'));
     }
   });
@@ -317,7 +317,7 @@ export function openEditWallet(owner, idx) {
   const types = getWalletTypes();
   const profiles = getProfiles();
 
-  // Дозволяємо переносити кошельок між власниками
+  // Дозволяємо переносити гаманець між власниками
   const ownerSelect = `
     <label class="ip-label">Власник</label>
     <select class="ip-input" data-ip-extra="owner">
@@ -328,7 +328,7 @@ export function openEditWallet(owner, idx) {
   `;
 
   openIconPicker({
-    title: 'Редагувати кошельок',
+    title: 'Редагувати гаманець',
     nameLabel: 'Назва',
     nameValue: card.id,
     extraFields: ownerSelect,
@@ -367,7 +367,7 @@ export function openEditWallet(owner, idx) {
       renderWalletsPage();
       showToast('💾 Видаляю...');
       syncSettingsToSheet()
-        .then(() => showToast('✅ Кошельок видалено'))
+        .then(() => showToast('✅ Гаманець видалено'))
         .catch(e => showToast('⚠️ Видалено локально, сервер: ' + e.message, 'error'));
     }
   });

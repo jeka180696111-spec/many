@@ -104,7 +104,7 @@ export function renderOperationsPage() {
         </button>
         <button class="ops-filter-btn ${f.card !== 'all' ? 'active' : ''}" id="opf-card" data-opf="card">
           <i class="ti ti-wallet"></i>
-          <span>${f.card !== 'all' ? esc(f.card) : 'Кошельок'}</span>
+          <span>${f.card !== 'all' ? esc(f.card) : 'Гаманець'}</span>
           <i class="ti ti-chevron-down opf-arrow"></i>
         </button>
       </div>

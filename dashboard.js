@@ -161,7 +161,7 @@ export function renderDashboard() {
           ${w.wallets ? `
           <div class="dash-card dash-wallets-card">
             <div class="dash-card-head">
-              <span class="dash-card-title">Кошельки${viewAs ? ' · ' + esc(profiles[viewAs]?.name || viewAs) : ''}</span>
+              <span class="dash-card-title">Гаманці${viewAs ? ' · ' + esc(profiles[viewAs]?.name || viewAs) : ''}</span>
               <div class="dash-card-actions">
                 <button class="dash-card-icon-btn" data-config="wallets" title="Налаштувати"><i class="ti ti-adjustments"></i></button>
                 <a href="#" class="dash-card-action" data-go="wallets">Усі →</a>
@@ -303,7 +303,7 @@ function renderSparkline(byDay, color) {
   `;
 }
 
-// ── Блок кошельків ──────────────────────────────────────────
+// ── Блок гаманців ──────────────────────────────────────────
 function renderWalletsBlock(viewAs) {
   const allCards = [];
   FAMILY_MEMBERS.forEach(m => {
@@ -359,8 +359,8 @@ function renderWalletsBlock(viewAs) {
 
   if (!cardsWithBal.length) {
     return visible !== null && visible.length === 0
-      ? '<div class="empty-mini">Усі кошельки приховано. Натисни ⚙ щоб налаштувати.</div>'
-      : '<div class="empty-mini">Жодного кошелька. Додай на сторінці Кошельки.</div>';
+      ? '<div class="empty-mini">Усі гаманці приховано. Натисни ⚙ щоб налаштувати.</div>'
+      : '<div class="empty-mini">Жодного гаманця. Додай на сторінці Гаманці.</div>';
   }
 
   return `
@@ -650,7 +650,7 @@ function bindHandlers(el) {
   });
 }
 
-// ── Діалог налаштування видимих кошельків ───────────────────
+// ── Діалог налаштування видимих гаманців ───────────────────
 function openWalletsVisibilityDialog() {
   import('./modals.js').then(({ openBottomSheet, closeModal }) => {
     const allCards = [];
@@ -689,7 +689,7 @@ function openWalletsVisibilityDialog() {
     }
 
     modalId = openBottomSheet({
-      title: 'Кошельки на дашборді',
+      title: 'Гаманці на дашборді',
       content: bodyHtml(),
       onOpen: (modal) => {
         function rerender() {

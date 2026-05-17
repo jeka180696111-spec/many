@@ -172,7 +172,7 @@
   color: var(--c-accent);
 }
 
-/* ── Vis dialog (видимість кошельків) — grid ────────────── */
+/* ── Vis dialog (видимість гаманців) — grid ────────────── */
 .vis-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -441,7 +441,7 @@ input[type="datetime-local"].ip-input {
 .ip-input-big { font-size: 24px; font-weight: 700; padding: 14px 16px; }
 select.ip-input { cursor: pointer; }
 
-/* Перемикач валюти у формі кошелька */
+/* Перемикач валюти у формі гаманця */
 .ip-cur-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -483,7 +483,7 @@ select.ip-input { cursor: pointer; }
   margin-left: 4px;
 }
 
-/* Валюта у мета-рядку кошелька */
+/* Валюта у мета-рядку гаманця */
 .wallet-row-cur {
   font-weight: 600;
   color: var(--c-text-3);

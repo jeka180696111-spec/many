@@ -95,7 +95,7 @@ export function openOperationDialog(opts = {}) {
           `).join('')}
         </div>
 
-        <label class="ip-label">Кошельок</label>
+        <label class="ip-label">Гаманець</label>
         <div class="op-wallet-scroll">
           ${myCards.map(c => `
             <button type="button" class="op-wallet-item ${c.id===curCard?'active':''}" data-op-card="${esc(c.id)}"
@@ -107,7 +107,7 @@ export function openOperationDialog(opts = {}) {
               ${c.currency && c.currency !== 'UAH' ? `<div class="op-wallet-item-cur">${c.currency}</div>` : ''}
             </button>
           `).join('')}
-          ${!myCards.length ? '<div class="empty-mini">Спочатку додай кошельок</div>' : ''}
+          ${!myCards.length ? '<div class="empty-mini">Спочатку додай гаманець</div>' : ''}
         </div>
 
         <label class="ip-label">Категорія</label>
@@ -150,7 +150,7 @@ export function openOperationDialog(opts = {}) {
               </button>
             `).join('')}
           </div>
-          <label class="ip-label">З кошелька</label>
+          <label class="ip-label">З гаманця</label>
           <div class="op-wallet-scroll">
             ${fromCards.map(c => `
               <button type="button" class="op-wallet-item ${c.id===curCard?'active':''}" data-from-card="${esc(c.id)}"
@@ -174,7 +174,7 @@ export function openOperationDialog(opts = {}) {
               </button>
             `).join('')}
           </div>
-          <label class="ip-label">На кошельок</label>
+          <label class="ip-label">На гаманець</label>
           <div class="op-wallet-scroll">
             ${toCards.map(c => `
               <button type="button" class="op-wallet-item ${c.id===curToCard?'active':''}" data-to-card="${esc(c.id)}">
@@ -371,8 +371,8 @@ export function openOperationDialog(opts = {}) {
 
       try {
         if (curType === 'Переказ') {
-          if (!curCard)   { showToast('Вибери кошельок відправника', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
-          if (!curToCard) { showToast('Вибери кошельок отримувача', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
+          if (!curCard)   { showToast('Вибери гаманець відправника', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
+          if (!curToCard) { showToast('Вибери гаманець отримувача', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
           await apiPost({
             action: 'addTransfer',
             fromWho: curMember, fromCard: curCard,
@@ -383,7 +383,7 @@ export function openOperationDialog(opts = {}) {
           });
         } else {
           if (!curCat)  { showToast('Вибери категорію', 'error'); btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
-          if (!curCard) { showToast('Вибери кошельок', 'error');  btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
+          if (!curCard) { showToast('Вибери гаманець', 'error');  btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
           const body = {
             action: isEdit ? 'updateOperation' : 'addOperation',
             type: curType, amount: amt, currency: cur,

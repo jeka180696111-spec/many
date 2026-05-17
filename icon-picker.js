@@ -27,7 +27,7 @@ export const COLOR_PALETTE = [
 //   nameLabel:   'Назва',
 //   nameValue:   '',
 //   namePlaceholder: 'Наприклад: Картка ПУМБ',
-//   showTypes:   true|false,        // показати селектор типу (для кошельків)
+//   showTypes:   true|false,        // показати селектор типу (для гаманців)
 //   typesList:   [{id,name,icon,bg,color}], // які типи на вибір
 //   selectedType: 'savings',          // обраний за замовчуванням
 //   selectedIcon: 'ti-wallet',

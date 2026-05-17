@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// TRANSFER — переказ між кошельками
+// TRANSFER — переказ між гаманцями
 // ═══════════════════════════════════════════════════════════════
 
 import { FAMILY_MEMBERS, state } from './config.js';
@@ -11,7 +11,7 @@ import { openBottomSheet, closeModal } from './modals.js';
 // ── Відкриття діалогу переказу ──────────────────────────────
 // presets: { fromOwner, fromCard, toOwner, toCard }
 export function openTransferDialog(presets = {}) {
-  // Збираємо всі кошельки
+  // Збираємо всі гаманці
   const allCards = [];
   FAMILY_MEMBERS.forEach(m => {
     getCards(m).forEach(c => allCards.push({ ...c, owner: m }));
@@ -62,14 +62,14 @@ export function openTransferDialog(presets = {}) {
     title: 'Переказ',
     content: `
       <div class="transfer-row">
-        <label class="ip-label">З кошелька</label>
+        <label class="ip-label">З гаманця</label>
         <select id="${fromId}" class="ip-input">${makeOptions(selFrom)}</select>
       </div>
 
       <div class="transfer-arrow"><i class="ti ti-arrow-down"></i></div>
 
       <div class="transfer-row">
-        <label class="ip-label">На кошельок</label>
+        <label class="ip-label">На гаманець</label>
         <select id="${toId}" class="ip-input">${makeOptionsWithSpecial(selTo)}</select>
       </div>
 

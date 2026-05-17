@@ -378,7 +378,7 @@ function renderMainMenu() {
       <div class="settings-menu-group">
         <button class="settings-menu-item" data-sub="default-wallet">
           <div class="settings-menu-icon" style="background:#DCFCE7;color:#16A34A"><i class="ti ti-wallet"></i></div>
-          <div class="settings-menu-label">Кошельок за замовчуванням</div>
+          <div class="settings-menu-label">Гаманець за замовчуванням</div>
           <i class="ti ti-chevron-right settings-menu-arrow"></i>
         </button>
         <button class="settings-menu-item" data-sub="dashboard-widgets">
@@ -403,7 +403,7 @@ function renderMainMenu() {
         </button>
         <button class="settings-menu-item" data-sub="wallets">
           <div class="settings-menu-icon" style="background:#DBEAFE;color:#1D4ED8"><i class="ti ti-building-bank"></i></div>
-          <div class="settings-menu-label">Кошельки та рахунки</div>
+          <div class="settings-menu-label">Гаманці та рахунки</div>
           <i class="ti ti-chevron-right settings-menu-arrow"></i>
         </button>
       </div>
@@ -441,7 +441,7 @@ const SUB_PAGE_TITLES = {
   family:         'Родина',
   appearance:     'Зовнішній вигляд',
   security:       'Безпека',
-  'default-wallet': 'Кошельок за замовчуванням',
+  'default-wallet': 'Гаманець за замовчуванням',
   telegram:       'Telegram сповіщення',
   sync:           'Синхронізація',
   plan:           'План витрат',
@@ -449,7 +449,7 @@ const SUB_PAGE_TITLES = {
   'exp-cats':     'Категорії витрат',
   'inc-cats':     'Категорії доходів',
   'wallet-types': 'Типи рахунків',
-  wallets:        'Кошельки',
+  wallets:        'Гаманці',
   subscription:   'Підписка',
   privacy:        'Політика конфіденційності',
   terms:          'Угода користувача',
@@ -721,7 +721,7 @@ function renderSubPageBody(key) {
     case 'wallet-types':
       return `
         <div class="settings-card">
-          <div class="settings-hint">Свої категорії для кошельків. Наприклад: «Криптогаманець», «Депозит», «Валюта в євро». Клік для редагування.</div>
+          <div class="settings-hint">Свої категорії для гаманців. Наприклад: «Криптогаманець», «Депозит», «Валюта в євро». Клік для редагування.</div>
           <div class="cat-grid" id="wallet-types-grid"></div>
           <button class="settings-add-btn" id="add-wallet-type-btn"><i class="ti ti-plus"></i> Додати тип</button>
         </div>
@@ -749,14 +749,14 @@ function renderSubPageBody(key) {
               </div>
             `;
           }).join('')}
-          <button class="settings-add-btn" id="add-wallet-btn"><i class="ti ti-plus"></i> Додати кошельок</button>
+          <button class="settings-add-btn" id="add-wallet-btn"><i class="ti ti-plus"></i> Додати гаманець</button>
         </div>
       `;
 
     case 'dashboard-widgets': {
       const widgets = JSON.parse(localStorage.getItem('budget_widgets') || '{}');
       const WIDGET_LIST = [
-        { key: 'wallets',   label: 'Кошельки' },
+        { key: 'wallets',   label: 'Гаманці' },
         { key: 'chart',     label: 'Графіки витрат/доходів' },
         { key: 'donut',     label: 'Кругова діаграма категорій' },
         { key: 'limits',    label: 'Топ категорій з лімітами' },
@@ -793,7 +793,7 @@ function renderSubPageBody(key) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
             <div style="padding:10px;border-radius:10px;background:var(--c-bg-3)">
               <div style="font-size:12px;font-weight:700;margin-bottom:6px">Безкоштовно</div>
-              ${['Облік витрат і доходів','Аналітика та звіти','Кілька кошельків','Категорії'].map(f => `
+              ${['Облік витрат і доходів','Аналітика та звіти','Кілька гаманців','Категорії'].map(f => `
                 <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
                   <i class="ti ti-check" style="font-size:12px;color:#16A34A;flex-shrink:0"></i>
                   <span style="font-size:11px;color:var(--c-text-2)">${f}</span>
@@ -883,7 +883,7 @@ function renderSubPageBody(key) {
           </div>
           ${[
             ['1. Загальні положення', 'Ця Політика конфіденційності описує, як Money Budget ("ми", "нас", "наш") збирає, використовує та захищає персональні дані користувачів додатку Money Budget. Використовуючи додаток, ви погоджуєтесь з умовами цієї Політики. Якщо ви не погоджуєтесь — будь ласка, припиніть використання додатку.'],
-            ['2. Які дані ми збираємо', 'Ми збираємо лише мінімально необхідні дані:\n• Ім\'я та email з вашого Google-акаунта (для авторизації)\n• Фінансові операції, які ви вводите вручну (суми, категорії, дати)\n• Налаштування кошельків та категорій\n• Цілі та плани накопичень\n• Telegram ID (якщо ви підключаєте бота)\n• Технічні дані: версія додатку, тип пристрою (для усунення помилок)\n\nМи НЕ збираємо: геолокацію, контакти, фото, SMS, push-повідомлення без дозволу, дані банківських карток або рахунків.'],
+            ['2. Які дані ми збираємо', 'Ми збираємо лише мінімально необхідні дані:\n• Ім\'я та email з вашого Google-акаунта (для авторизації)\n• Фінансові операції, які ви вводите вручну (суми, категорії, дати)\n• Налаштування гаманців та категорій\n• Цілі та плани накопичень\n• Telegram ID (якщо ви підключаєте бота)\n• Технічні дані: версія додатку, тип пристрою (для усунення помилок)\n\nМи НЕ збираємо: геолокацію, контакти, фото, SMS, push-повідомлення без дозволу, дані банківських карток або рахунків.'],
             ['3. Як ми використовуємо дані', 'Зібрані дані використовуються виключно для:\n• Надання функціоналу додатку (облік фінансів, аналітика)\n• Синхронізації даних між пристроями\n• Надсилання сповіщень через Telegram-бот (якщо підключено)\n• Генерації AI-звітів та рекомендацій (дані не зберігаються в AI-системі)\n• Технічної підтримки та усунення помилок\n\nМи НЕ використовуємо ваші дані для реклами, продажу третім особам або профілювання.'],
             ['4. Зберігання та безпека даних', 'Усі дані зберігаються в хмарній базі Firebase (Google Cloud):\n• Шифрування в стані спокою: AES-256\n• Шифрування під час передачі: TLS 1.3\n• Сервери розташовані в регіоні Євросоюзу (Бельгія, Frankfurt)\n• Доступ до бази захищений правилами безпеки Firebase\n• Регулярне резервне копіювання даних\n\nМи застосовуємо принцип мінімальних привілеїв: жоден співробітник не має прямого доступу до ваших фінансових даних без технічної необхідності.'],
             ['5. Хто має доступ до ваших даних', 'Доступ до ваших даних мають:\n• Ви особисто\n• Члени родини, яких ви самостійно запросили до спільного акаунту\n• Команда розробників Money Budget — лише у технічних цілях (усунення критичних помилок) і виключно через знеособлені логи\n\nТретіх сторін з доступом до ваших фінансових даних — немає. Жодного доступу рекламним мережам, аналітичним платформам або державним органам (крім випадків, передбачених законом України).'],
@@ -979,7 +979,7 @@ function renderSubPageBody(key) {
         <div class="settings-card" style="margin-bottom:12px">
           <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--c-text-3);margin-bottom:10px">Можливості</div>
           ${[
-            ['ti-wallet','Кілька кошельків','Готівка, банківські картки, валютні рахунки — все в одному місці'],
+            ['ti-wallet','Кілька гаманців','Готівка, банківські картки, валютні рахунки — все в одному місці'],
             ['ti-users','Спільний бюджет','Додайте членів родини та відстежуйте витрати разом'],
             ['ti-robot','AI · Фінн','Персональний фінансовий радник на базі Claude AI'],
             ['ti-brand-telegram','Telegram-бот','Додавайте операції голосом або текстом прямо з месенджера'],

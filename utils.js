@@ -30,7 +30,7 @@ export function toUah(amount, currency, fx) {
   return Math.round(amount * rate);
 }
 
-// Формат із UAH в дужках для валютних кошельків
+// Формат із UAH в дужках для валютних гаманців
 // USD/EUR → "$200 (≈ 8 798 ₴)" або "−$200 (≈ −8 798 ₴)"
 // UAH → "40 077 ₴" або "−40 077 ₴" (без дужок)
 export function fmtMoneyWithUah(amount, currency, fx) {
@@ -179,7 +179,7 @@ export function exportOperationsToCSV(operations) {
   }
 
   const SEP = ';';
-  const headers = ['Дата', 'Тип', 'Категорія', 'Сума', 'Валюта', 'Сума (UAH)', 'Кошельок', 'Хто', 'Коментар'];
+  const headers = ['Дата', 'Тип', 'Категорія', 'Сума', 'Валюта', 'Сума (UAH)', 'Гаманець', 'Хто', 'Коментар'];
 
   function fmtDate(raw) {
     if (!raw) return '';

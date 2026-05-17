@@ -32,7 +32,7 @@ import { initEdgeSwipe } from './gestures.js';
 
 const PAGE_TITLES = {
   dashboard: 'Головна',
-  wallets: 'Кошельки',
+  wallets: 'Гаманці',
   operations: 'Операції',
   analytics: 'Аналіз',
   reserve: 'Накопичення',
@@ -200,7 +200,7 @@ function renderSidebar() {
     <nav class="sb-nav">
       <div class="sb-section-label">Головне</div>
       <a class="sb-item active" data-nav-page="dashboard"><i class="ti ti-layout-dashboard"></i> Дашборд</a>
-      <a class="sb-item" data-nav-page="wallets"><i class="ti ti-wallet"></i> Кошельки</a>
+      <a class="sb-item" data-nav-page="wallets"><i class="ti ti-wallet"></i> Гаманці</a>
       <a class="sb-item" data-nav-page="operations"><i class="ti ti-list"></i> Операції</a>
       <a class="sb-item" data-nav-page="analytics"><i class="ti ti-chart-bar"></i> Аналіз</a>
       <div class="sb-section-label">Фінанси</div>
@@ -333,7 +333,7 @@ function renderBottomNav() {
   if (!bn) return;
   bn.innerHTML = `
     <a class="bn-item ${state.currentPage==='dashboard'?'active':''}" data-nav-page="dashboard"><i class="ti ti-layout-dashboard"></i><span>Дашборд</span></a>
-    <a class="bn-item ${state.currentPage==='wallets'?'active':''}" data-nav-page="wallets"><i class="ti ti-wallet"></i><span>Кошельки</span></a>
+    <a class="bn-item ${state.currentPage==='wallets'?'active':''}" data-nav-page="wallets"><i class="ti ti-wallet"></i><span>Гаманці</span></a>
     <button class="bn-fab" id="bn-fab-btn"><i class="ti ti-plus"></i></button>
     <a class="bn-item ${state.currentPage==='operations'?'active':''}" data-nav-page="operations"><i class="ti ti-list"></i><span>Операції</span></a>
     <a class="bn-item ${state.currentPage==='settings'?'active':''}" data-nav-page="settings"><i class="ti ti-settings"></i><span>Ще</span></a>

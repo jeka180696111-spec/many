@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// RESERVE — Накопичення: кошельки типу "savings" + рез. резерв
+// RESERVE — Накопичення: гаманці типу "savings" + рез. резерв
 // ═══════════════════════════════════════════════════════════════
 
 import { FAMILY_MEMBERS, state } from './config.js';
@@ -22,7 +22,7 @@ export function renderReservePage() {
   const el = document.getElementById('page-reserve');
   if (!el) return;
 
-  // ── Збираємо кошельки типу "savings" по всіх власниках ──
+  // ── Збираємо гаманці типу "savings" по всіх власниках ──
   const profiles = getProfiles();
   const viewAs = getViewAsMember();
   const savingsCards = [];
@@ -36,7 +36,7 @@ export function renderReservePage() {
     });
   });
 
-  // ── Рахуємо баланс кожного кошелька накопичень у власній валюті ──
+  // ── Рахуємо баланс кожного гаманця накопичень у власній валюті ──
   const ops = state.operations || [];
   function cardBalance(card) {
     let bal = 0;
@@ -119,11 +119,11 @@ export function renderReservePage() {
         <button class="btn-ghost flex-1" id="withdraw-reserve-btn"><i class="ti ti-minus"></i> Зняти</button>
       </div>
 
-      <!-- Кошельки накопичень (нова логіка) -->
+      <!-- Гаманці накопичень (нова логіка) -->
       ${cardsWithBal.length > 0 ? `
         <div class="dash-card">
           <div class="dash-card-head">
-            <span class="dash-card-title">Кошельки накопичень</span>
+            <span class="dash-card-title">Гаманці накопичень</span>
             <span class="dash-card-amount">${fmtMoney(totalSavings, 'UAH')}</span>
           </div>
           <div class="reserve-cards-list">
@@ -143,7 +143,7 @@ export function renderReservePage() {
         </div>
       ` : `
         <div class="settings-hint" style="padding:14px;border-radius:var(--radius);background:var(--c-card);border:1px solid var(--c-border);margin-bottom:14px;">
-          💡 Створи кошельок з типом <b>Накопичення</b> на сторінці Кошельки — і він автоматично з'явиться тут.
+          💡 Створи гаманець з типом <b>Накопичення</b> на сторінці Гаманці — і він автоматично з'явиться тут.
         </div>
       `}
 
@@ -192,7 +192,7 @@ export function renderReservePage() {
     requestAnimationFrame(tick);
   });
 
-  // Клік на кошельок накопичень — перехід в Кошельки
+  // Клік на гаманець накопичень — перехід в Гаманці
   el.querySelectorAll('[data-savings-card]').forEach(item => {
     item.addEventListener('click', () => {
       import('./main.js').then(m => m.navigateTo('wallets'));
@@ -266,7 +266,7 @@ function openReserveDialog(type) {
     title: type,
     content: `
       <div class="settings-hint" style="padding:0 0 12px;border:none;">
-        💡 Це резерв (окремий лист у таблиці). Для накопичень у кошельках — додавай операції напряму через "+" на той кошельок.
+        💡 Це резерв (окремий лист у таблиці). Для накопичень у гаманцях — додавай операції напряму через "+" на той гаманець.
       </div>
       <div class="op-amount-row">
         <input id="${amtId}" class="op-amount-input" type="number" inputmode="decimal" step="0.01" placeholder="0">
