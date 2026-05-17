@@ -1,7 +1,7 @@
-// Shared Telegram bot handler factory
+// Shared Telegram bot handler factory (ESM)
 // Used by telegram.js (personal bot) and telegram-public.js (public bot)
 
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -14,7 +14,7 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-module.exports = function createHandler(BOT_TOKEN) {
+export default function createHandler(BOT_TOKEN) {
 
 // ── Категорії ────────────────────────────────────────────────
 const EXPENSE_CATS = ['Продукти', 'Ресторани', 'Транспорт', 'Комунальні', "Здоров'я", 'Одяг', 'Розваги', 'Дім', 'Дитячі', 'Інше'];
@@ -67,6 +67,10 @@ async function answerCallback(callbackId, text = '') {
   await tgPost('answerCallbackQuery', { callback_query_id: callbackId, text });
 }
 
+async function sendTypingAction(chatId) {
+  await tgPost('sendChatAction', { chat_id: chatId, action: 'typing' });
+}
+
 // ── Helpers ──────────────────────────────────────────────────
 function todayKyiv() {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Kyiv' });
@@ -95,21 +99,18 @@ function weekRange() {
 }
 
 // ── User management (multi-family) ──────────────────────────
-// Telegram user → {name, familyId} or null (if not registered)
 async function getTelegramUser(telegramUserId) {
   try {
     const doc = await db.collection('telegramLinks').doc(String(telegramUserId)).get();
-    if (doc.exists) return doc.data(); // {name, familyId, registeredAt}
+    if (doc.exists) return doc.data();
   } catch (e) {}
   return null;
 }
 
-// Register after collecting name + invite code
 async function registerTelegramUser(telegramUserId, { name, familyId }) {
   await db.collection('telegramLinks').doc(String(telegramUserId)).set({
     name, familyId, registeredAt: new Date().toISOString(),
   });
-  // Add to family members list if not already there
   try {
     const familyRef = db.collection('families').doc(familyId);
     const familyDoc = await familyRef.get();
@@ -123,7 +124,6 @@ async function registerTelegramUser(telegramUserId, { name, familyId }) {
   } catch (e) { console.error('registerTelegramUser family update error:', e); }
 }
 
-// Multi-step registration state: step='name' or step='code', pending name stored
 async function setPendingReg(userId, data = {}) {
   await db.collection('telegramPending').doc(String(userId)).set({
     createdAt: new Date().toISOString(),
@@ -145,7 +145,6 @@ async function clearPendingReg(userId) {
   await db.collection('telegramPending').doc(String(userId)).delete();
 }
 
-// Validate invite code → returns familyId or null
 async function validateInviteCode(code) {
   try {
     const doc = await db.collection('invites').doc(code.toUpperCase()).get();
@@ -182,8 +181,6 @@ async function deletePending(id, familyId) {
 }
 
 // ── Firestore queries ────────────────────────────────────────
-
-// Курси валют з meta/fx (як у головному додатку)
 async function getExchangeRates() {
   try {
     const doc = await db.collection('meta').doc('fx').get();
@@ -270,7 +267,6 @@ async function downloadTelegramPhoto(fileId) {
 // ── Обробка фото чека ────────────────────────────────────────
 async function handleReceiptPhoto(chatId, who, familyId, msg, res) {
   try {
-    // Беремо найбільше фото
     const photos = [...msg.photo].sort((a, b) => (b.file_size || 0) - (a.file_size || 0));
     const fileId = photos[0].file_id;
 
@@ -351,7 +347,6 @@ async function saveOperation(op) {
   });
 }
 
-// Баланс по кошельках з урахуванням валюти та кредитних лімітів
 async function getWalletBalances(familyId) {
   const [snapshot, rates, settingsDoc] = await Promise.all([
     db.collection('families').doc(familyId).collection('operations').get(),
@@ -368,7 +363,6 @@ async function getWalletBalances(familyId) {
         if (c.creditLimit) creditLimits[c.id] = Number(c.creditLimit);
       });
     });
-    // Backwards compat with old cardsEvgen/cardsMarina format
     ['cardsEvgen', 'cardsMarina'].forEach(key => {
       (s[key] || []).forEach(c => {
         if (c.creditLimit) creditLimits[c.id] = Number(c.creditLimit);
@@ -453,18 +447,87 @@ async function getTodaySameCategoryOps(familyId, who, category) {
   return snapshot.docs.map(d => d.data());
 }
 
+// ── AI history ───────────────────────────────────────────────
+async function getAIHistory(userId) {
+  try {
+    const doc = await db.collection('telegramAIChats').doc(String(userId)).get();
+    return doc.exists ? (doc.data().messages || []) : [];
+  } catch (e) { return []; }
+}
+
+async function saveAIHistory(userId, messages) {
+  try {
+    await db.collection('telegramAIChats').doc(String(userId)).set({
+      messages: messages.slice(-12),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (e) {}
+}
+
+async function buildMonthlyContext(familyId, who) {
+  try {
+    const { from, to, label } = currentMonthRange();
+    const [ops, wallets] = await Promise.all([
+      getPeriodOps(familyId, from, to),
+      getWalletBalances(familyId),
+    ]);
+
+    const expenses = ops.filter(o => o.type === 'Витрата');
+    const incomes  = ops.filter(o => o.type === 'Дохід');
+    const totalExp = expenses.reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
+    const totalInc = incomes.reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
+    const totalBal = wallets.reduce((s, w) => s + w.balanceUah, 0);
+
+    const byCat = {};
+    expenses.forEach(o => {
+      const cat = o.category || 'Інше';
+      byCat[cat] = (byCat[cat] || 0) + (o.amountUah || o.amount || 0);
+    });
+    const catLines = Object.entries(byCat)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, amt]) => `  ${cat}: ${fmtMoney(amt)}`).join('\n');
+
+    const walletLines = wallets.slice(0, 6)
+      .map(w => `  ${w.name}: ${w.balance > 0 ? '+' : ''}${w.balance} ${w.primaryCur}${w.creditLimit ? ` (кредит ${fmtMoney(w.creditAvail)} вільно)` : ''}`).join('\n');
+
+    const lastOps = ops.slice(0, 5).map(o => `  ${o.date} ${o.type === 'Витрата' ? '-' : '+'}${o.amount}${o.currency !== 'UAH' ? o.currency : '₴'} ${o.desc || o.category}`).join('\n');
+
+    return `=== БЮДЖЕТ (${label}) ===\nУчасник: ${who}\nБаланс: ${fmtMoney(totalBal)}\nДоходи: ${fmtMoney(totalInc)} | Витрати: ${fmtMoney(totalExp)} | Зекономлено: ${fmtMoney(Math.max(0, totalInc - totalExp))}\n\nВитрати по категоріях:\n${catLines || '  (ще немає)'}\n\nРахунки:\n${walletLines || '  (немає)'}\n\nОстанні операції:\n${lastOps || '  (немає)'}`;
+  } catch (e) {
+    return `Учасник: ${who}. Дані бюджету тимчасово недоступні.`;
+  }
+}
+
 // ── Keyboards ────────────────────────────────────────────────
 const MAIN_KEYBOARD = {
-  keyboard: [
-    [{ text: '💰 Баланс' },     { text: '📅 Сьогодні' }],
-    [{ text: '📆 Місяць' },     { text: '⏱ Тиждень' }],
-    [{ text: '📊 Статистика' }, { text: '📋 Останні' }],
-    [{ text: '➕ Витрата' },    { text: '💵 Дохід' }],
-    [{ text: '📸 Фото чека' },  { text: '❓ Допомога' }],
-    [{ text: '📊 Звіт місяця' }],
-  ],
+  keyboard: [[{ text: '☰ Меню' }]],
   resize_keyboard: true,
   is_persistent: true,
+};
+
+const MENU_INLINE = {
+  inline_keyboard: [
+    [
+      { text: '➕ Витрата',    callback_data: 'mn:expense' },
+      { text: '💵 Дохід',      callback_data: 'mn:income' },
+      { text: '📸 Чек',        callback_data: 'mn:receipt' },
+    ],
+    [
+      { text: '💰 Баланс',     callback_data: 'mn:balance' },
+      { text: '📅 Сьогодні',   callback_data: 'mn:today' },
+      { text: '📆 Місяць',     callback_data: 'mn:month' },
+    ],
+    [
+      { text: '⏱ Тиждень',    callback_data: 'mn:week' },
+      { text: '📊 Статистика', callback_data: 'mn:stats' },
+      { text: '📋 Останні',    callback_data: 'mn:last' },
+    ],
+    [
+      { text: '📊 Звіт',       callback_data: 'mn:report' },
+      { text: '🤖 AI Фінн',    callback_data: 'mn:ai' },
+      { text: '❓ Допомога',   callback_data: 'mn:help' },
+    ],
+  ],
 };
 
 function buildConfirmKeyboard(pendingId, type) {
@@ -606,7 +669,6 @@ async function handleCallback(cb, res) {
   const [action, id, ...rest] = data.split(':');
   const newCat = rest.join(':');
 
-  // familyId stored in pending op
   const tgUser = await getTelegramUser(userId);
   const familyId = tgUser?.familyId;
   if (!familyId) {
@@ -637,7 +699,6 @@ async function handleCallback(cb, res) {
     await editMessage(chatId, messageId, txt);
     await answerCallback(cb.id, '✅ Збережено!');
 
-    // Проактивний саркастичний коментар при дублікаті категорії за день
     if (op.type === 'Витрата') {
       try {
         const todayOps = await getTodaySameCategoryOps(familyId, op.who, op.category);
@@ -680,6 +741,27 @@ async function handleCallback(cb, res) {
     return res.status(200).json({ ok: true });
   }
 
+  if (action === 'mn') {
+    await answerCallback(cb.id);
+    const who = tgUser?.name || '';
+    const userName = cb.from.first_name || '';
+    const CMD = { balance: '/balance', today: '/today', month: '/month', week: '/week', stats: '/stats', last: '/last', report: '/report', help: '/help', ai: '/ai' };
+    if (id === 'expense') {
+      await sendMessage(chatId, `➕ <b>Напиши витрату:</b>\n<code>каву 85</code>\n<code>продукти 500 моно</code>\n<code>бензин 1200 готівка</code>\n<code>50$ готівка</code>\n\nАбо надішли 📸 фото чека`);
+      return res.status(200).json({ ok: true });
+    }
+    if (id === 'income') {
+      await sendMessage(chatId, `💵 <b>Напиши дохід:</b>\n<code>зп 40000</code>\n<code>дохід 5000 підробіток</code>\n<code>повернення 500</code>`);
+      return res.status(200).json({ ok: true });
+    }
+    if (id === 'receipt') {
+      await sendMessage(chatId, `📸 <b>Надішли фото чека</b> — розпізнаю суму, магазин та категорію автоматично.\n\n<i>Порада: фото чітке, чек повністю в кадрі</i>`);
+      return res.status(200).json({ ok: true });
+    }
+    if (CMD[id]) return handleCommand(CMD[id], chatId, userId, userName, who, familyId, res);
+    return res.status(200).json({ ok: true });
+  }
+
   await answerCallback(cb.id);
   return res.status(200).json({ ok: true });
 }
@@ -704,10 +786,11 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
         `⏱ <b>Тиждень</b> — операції за останні 7 днів\n` +
         `📊 <b>Статистика</b> — витрати по категоріях з графіком\n` +
         `📋 <b>Останні</b> — 5 останніх операцій (можна видалити)\n\n` +
-        `<b>🤖 AI-питання</b> — просто постав питання:\n` +
+        `<b>🤖 AI-чат (Фінн)</b> — напиши будь-яке питання:\n` +
         `<i>"Де я найбільше витрачаю?"</i>\n` +
         `<i>"Як скоротити витрати?"</i>\n` +
-        `<i>"Аналіз моїх фінансів"</i>`,
+        `<i>"Аналіз цього місяця"</i>\n` +
+        `Або /forget — очистити пам'ять розмови з AI`,
         { reply_markup: MAIN_KEYBOARD }
       );
       return res.status(200).json({ ok: true });
@@ -730,7 +813,6 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
           const sym = SYM[w.primaryCur] || w.primaryCur;
           txt += `💳 <b>${w.name}</b>: ${sign}${absNative} ${sym} (≈ ${sign === '−' ? '−' : ''}${fmtMoney(absUah)})\n`;
         } else if (w.creditLimit > 0) {
-          // Кредитна картка: показуємо власні кошти і кредит окремо
           const ownFunds = Math.max(0, w.balance);
           if (w.creditUsed > 0) {
             txt += `💳 <b>${w.name}</b>: −${fmtMoney(w.creditUsed)} <i>(кредит)</i>\n`;
@@ -859,9 +941,17 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
       return res.status(200).json({ ok: true });
     }
 
-    default:
-      await sendMessage(chatId, `❓ Невідома команда. Натисни кнопку нижче або напиши витрату.`, { reply_markup: MAIN_KEYBOARD });
+    case '/ai':
+      await sendMessage(chatId, `🤖 <b>Привіт, я Фінн!</b>\n\nПростав питання про свій бюджет — відповім з даними.\n\n<i>Приклади:\n• "Скільки я витратив цього місяця?"\n• "Де найбільше витрачаю?"\n• "Дай поради як зекономити"</i>`);
       return res.status(200).json({ ok: true });
+
+    case '/forget':
+      await saveAIHistory(userId, []);
+      await sendMessage(chatId, `🗑 <b>Пам'ять очищено.</b>\nФінн забув нашу розмову і починає з чистого аркуша.`);
+      return res.status(200).json({ ok: true });
+
+    default:
+      return handleAIChat(chatId, cmd, who, familyId, userId, res);
   }
 }
 
@@ -895,48 +985,47 @@ async function generateSarcasticComment(op, todayOps) {
 }
 
 // ── AI Чат ───────────────────────────────────────────────────
-function isConversational(text) {
-  if (text.length < 4) return false;
-  if (text.includes('?') || text.includes('?')) return true;
-  const triggers = ['як', 'що', 'де', 'чому', 'скільки', 'коли', 'чи', 'поради', 'порада', 'допоможи', 'розкажи', 'поясни', 'аналіз', 'звіт', 'прогноз', 'розбір', 'критикуй', 'оціни', 'думаєш'];
-  const lower = text.toLowerCase();
-  return triggers.some(t => lower.startsWith(t) || lower.includes(' ' + t));
-}
+async function handleAIChat(chatId, userText, who, familyId, userId, res) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    await sendMessage(chatId, '❌ AI ключ не налаштований.');
+    return res.status(200).json({ ok: true });
+  }
 
-async function handleAIChat(chatId, userText, who, familyId, res) {
+  await sendTypingAction(chatId);
+
   try {
-    const [wallets, recentOps] = await Promise.all([
-      getWalletBalances(familyId),
-      getLastOps(familyId, 10),
+    const [history, context] = await Promise.all([
+      getAIHistory(userId),
+      buildMonthlyContext(familyId, who),
     ]);
-    const totalUah = wallets.reduce((s, w) => s + w.balanceUah, 0);
-    const recentExp = recentOps.filter(o => o.type === 'Витрата').slice(0, 5)
-      .map(o => `${o.desc || o.category} ${o.amount}₴`).join(', ');
-    const context = `Користувач: ${who}. Загальний баланс: ${fmtMoney(totalUah)}. Останні витрати: ${recentExp || 'немає'}.`;
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      await sendMessage(chatId, '❌ AI ключ не налаштований.');
-      return res.status(200).json({ ok: true });
-    }
+    const systemPrompt = `Ти — Фінн, саркастичний фінансовий радник сімейного бюджету.
+Стиль: дотепний, іноді їдкий, але з щирою турботою. Відповідай ТІЛЬКИ УКРАЇНСЬКОЮ.
+Довжина: 2-5 речень. Емодзі: 1-2 max. Якщо є числа в даних — використовуй їх.
+Якщо запитують пораду — давай конкретну, практичну.
+Якщо не знаєш — чесно скажи, не вигадуй.
 
-    const systemPrompt = `Ти — саркастичний фінансовий радник на ім'я Фінн. Стиль: дотепний, їдкий, але з турботою.
-Правила: відповідай УКРАЇНСЬКОЮ, коротко (2-4 речення), використовуй конкретні цифри якщо є, емодзі помірно.
 ${context}`;
+
+    const messages = [...history, { role: 'user', content: userText }];
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        max_tokens: 500,
         system: systemPrompt,
-        messages: [{ role: 'user', content: userText }],
+        messages,
       }),
     });
 
     const data = await response.json();
     const reply = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || 'Щось пішло не так 🤷';
+
+    saveAIHistory(userId, [...messages, { role: 'assistant', content: reply }]);
+
     await sendMessage(chatId, reply);
   } catch (e) {
     await sendMessage(chatId, '❌ Помилка AI: ' + e.message);
@@ -950,6 +1039,21 @@ ${context}`;
 
 return async function handler(req, res) {
   if (req.method !== 'POST') {
+    await tgPost('setMyCommands', {
+      commands: [
+        { command: 'start',   description: 'Почати / перезапустити бота' },
+        { command: 'help',    description: 'Список можливостей' },
+        { command: 'balance', description: 'Баланс по рахунках' },
+        { command: 'today',   description: 'Операції за сьогодні' },
+        { command: 'month',   description: 'Витрати і доходи за місяць' },
+        { command: 'week',    description: 'Операції за тиждень' },
+        { command: 'stats',   description: 'Статистика по категоріях' },
+        { command: 'last',    description: '5 останніх операцій' },
+        { command: 'report',  description: 'Детальний звіт місяця' },
+        { command: 'ai',      description: 'AI-радник Фінн' },
+        { command: 'forget',  description: 'Очистити пам\'ять AI' },
+      ],
+    });
     return res.status(200).json({ ok: true, message: 'Telegram webhook endpoint' });
   }
 
@@ -957,7 +1061,6 @@ return async function handler(req, res) {
     const update = req.body;
     if (!update) return res.status(200).json({ ok: true });
 
-    // Callback від inline кнопок
     if (update.callback_query) {
       return handleCallback(update.callback_query, res);
     }
@@ -1014,7 +1117,6 @@ return async function handler(req, res) {
     // ── Перевіряємо чи є зареєстрований Telegram-акаунт ─────
     const tgUser = await getTelegramUser(userId);
 
-    // /start — завжди доступний, запускає реєстрацію якщо потрібно
     if (text === '/start') {
       if (tgUser) {
         await sendMessage(chatId,
@@ -1042,86 +1144,30 @@ return async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    // Незареєстрований — просимо пройти реєстрацію
     if (!tgUser) {
-      await sendMessage(chatId,
-        `⚠️ Ти ще не зареєстрований.\n\nНатисни /start щоб почати реєстрацію.`
-      );
+      await sendMessage(chatId, `⚠️ Ти ще не зареєстрований.\n\nНатисни /start щоб почати реєстрацію.`);
       return res.status(200).json({ ok: true });
     }
 
     const who = tgUser.name;
     const familyId = tgUser.familyId;
 
-    // Фото чека
     if (msg.photo && msg.photo.length > 0) {
       return handleReceiptPhoto(chatId, who, familyId, msg, res);
     }
 
-    // Фото чека
-    if (msg.photo && msg.photo.length > 0) {
-      return handleReceiptPhoto(chatId, who, msg, res);
-    }
-
-    // Команди
     if (text.startsWith('/')) {
       return handleCommand(text.split(' ')[0].toLowerCase(), chatId, userId, userName, who, familyId, res);
     }
 
-    // Reply keyboard кнопки
-    const BTN_MAP = {
-      '💰 Баланс':      '/balance',
-      '📅 Сьогодні':    '/today',
-      '📆 Місяць':      '/month',
-      '⏱ Тиждень':     '/week',
-      '📊 Статистика':  '/stats',
-      '📋 Останні':     '/last',
-      '❓ Допомога':    '/help',
-      '📊 Звіт місяця': '/report',
-    };
-
-    if (BTN_MAP[text]) {
-      return handleCommand(BTN_MAP[text], chatId, userId, userName, who, familyId, res);
-    }
-
-    if (text === '➕ Витрата') {
-      await sendMessage(chatId,
-        `➕ <b>Напиши витрату:</b>\n` +
-        `<code>каву 85</code>\n` +
-        `<code>продукти 500 моно</code>\n` +
-        `<code>бензин 1200 готівка</code>\n` +
-        `<code>50$ готівка</code>\n\n` +
-        `Або надішли 📸 <b>фото чека</b> — розпізнаю автоматично`
-      );
-      return res.status(200).json({ ok: true });
-    }
-    if (text === '💵 Дохід') {
-      await sendMessage(chatId,
-        `💵 <b>Напиши дохід:</b>\n` +
-        `<code>зп 40000</code>\n` +
-        `<code>дохід 5000 підробіток</code>\n` +
-        `<code>повернення 500</code>`
-      );
-      return res.status(200).json({ ok: true });
-    }
-    if (text === '📸 Фото чека') {
-      await sendMessage(chatId,
-        `📸 <b>Надішли фото чека</b> — я розпізнаю суму, магазин та категорію автоматично.\n\n` +
-        `<i>Порада: фото має бути чітким, чек повністю в кадрі</i>`
-      );
+    if (text === '☰ Меню') {
+      await sendMessage(chatId, `📋 <b>Меню</b> — обери дію:`, { reply_markup: MENU_INLINE });
       return res.status(200).json({ ok: true });
     }
 
-    // Парсимо операцію і показуємо для підтвердження
     const parsed = parseMessage(text);
     if (!parsed) {
-      if (isConversational(text)) {
-        return handleAIChat(chatId, text, who, familyId, res);
-      }
-      await sendMessage(chatId,
-        `🤔 Не зрозумів. Напиши суму і опис:\n<code>каву 85</code>\n<code>зп 40000</code>\n\nАбо постав питання — я відповім 😏`
-      );
-      return res.status(200).json({ ok: true });
+      return handleAIChat(chatId, text, who, familyId, userId, res);
     }
 
     const rates = await getExchangeRates();
@@ -1142,5 +1188,6 @@ return async function handler(req, res) {
     console.error('Telegram webhook error:', error);
     return res.status(200).json({ ok: true, error: error.message });
   }
-  };
-}; // end createHandler
+};
+
+} // end createHandler
