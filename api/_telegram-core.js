@@ -498,6 +498,78 @@ async function buildMonthlyContext(familyId, who) {
   }
 }
 
+// ── Wallet emoji ─────────────────────────────────────────────
+const WALLET_EMOJI_MAP = [
+  [['готівк', 'cash', 'нал'],           '💵'],
+  [['моно', 'mono'],                    '🟡'],
+  [['пумб'],                            '🏛'],
+  [['приват', 'privat'],                '💙'],
+  [['долар', 'usd'],                    '🟢'],
+  [['євро', 'euro', 'eur'],             '💶'],
+  [['накоп', 'депоз', 'заощ', 'savings', 'ощад'], '🏦'],
+  [['кредит', 'credit'],                '💳'],
+  [['без рахунку'],                     '💰'],
+];
+
+function walletEmoji(name) {
+  const lower = name.toLowerCase();
+  for (const [keys, emoji] of WALLET_EMOJI_MAP) {
+    if (keys.some(k => lower.includes(k))) return emoji;
+  }
+  return '🪙';
+}
+
+// ── Greeting + balance info panel ────────────────────────────
+function timeGreeting() {
+  const h = parseInt(new Date().toLocaleString('uk-UA', { timeZone: 'Europe/Kyiv', hour: 'numeric', hour12: false }));
+  if (h < 6)  return '🌙 Доброї ночі';
+  if (h < 12) return '🌅 Доброго ранку';
+  if (h < 18) return '☀️ Доброго дня';
+  return '🌆 Доброго вечора';
+}
+
+async function buildInfoPanel(who, familyId) {
+  try {
+    const { from, to } = currentMonthRange();
+    const [wallets, ops] = await Promise.all([
+      getWalletBalances(familyId),
+      getPeriodOps(familyId, from, to),
+    ]);
+
+    const total   = wallets.reduce((s, w) => s + w.balanceUah, 0);
+    const savingsKeys = ['накоп', 'депоз', 'заощ', 'savings', 'ощад'];
+    const savings = wallets
+      .filter(w => savingsKeys.some(k => w.name.toLowerCase().includes(k)))
+      .reduce((s, w) => s + w.balanceUah, 0);
+    const free    = wallets
+      .filter(w => w.creditLimit === 0 && !savingsKeys.some(k => w.name.toLowerCase().includes(k)))
+      .reduce((s, w) => s + w.balanceUah, 0);
+
+    const totalExp = ops.filter(o => o.type === 'Витрата').reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
+    const totalInc = ops.filter(o => o.type === 'Дохід').reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
+
+    let txt = `${timeGreeting()}, <b>${who}</b>!\n`;
+    txt += `━━━━━━━━━━━━━━━\n`;
+    txt += `💎 Разом: <b>${total >= 0 ? '+' : '−'}${fmtMoney(Math.abs(total))}</b>\n`;
+    if (savings > 0) {
+      txt += `🏦 Накопичення: <b>+${fmtMoney(savings)}</b>\n`;
+      txt += `💵 Вільні: <b>${free >= 0 ? '+' : '−'}${fmtMoney(Math.abs(free))}</b>\n`;
+    } else {
+      txt += `💵 Вільні кошти: <b>${free >= 0 ? '+' : '−'}${fmtMoney(Math.abs(free))}</b>\n`;
+    }
+    txt += `━━━━━━━━━━━━━━━\n`;
+    if (totalInc > 0 || totalExp > 0) {
+      txt += `📅 Місяць: -${fmtMoney(totalExp)} витрат`;
+      if (totalInc > 0) txt += ` · +${fmtMoney(totalInc)} доходів`;
+      txt += `\n`;
+    }
+    txt += `\n📋 <b>Обери дію:</b>`;
+    return txt;
+  } catch (e) {
+    return `${timeGreeting()}, <b>${who}</b>!\n\n📋 <b>Обери дію:</b>`;
+  }
+}
+
 // ── Keyboards ────────────────────────────────────────────────
 const MAIN_KEYBOARD = {
   keyboard: [[{ text: '☰ Меню' }]],
@@ -809,9 +881,10 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
         const sign = pos ? '+' : '−';
         const absNative = Math.abs(w.balance);
         const absUah = Math.abs(w.balanceUah);
+        const wEmoji = walletEmoji(w.name);
         if (w.primaryCur !== 'UAH') {
           const sym = SYM[w.primaryCur] || w.primaryCur;
-          txt += `💳 <b>${w.name}</b>: ${sign}${absNative} ${sym} (≈ ${sign === '−' ? '−' : ''}${fmtMoney(absUah)})\n`;
+          txt += `${wEmoji} <b>${w.name}</b>: ${sign}${absNative} ${sym} (≈ ${sign === '−' ? '−' : ''}${fmtMoney(absUah)})\n`;
         } else if (w.creditLimit > 0) {
           const ownFunds = Math.max(0, w.balance);
           if (w.creditUsed > 0) {
@@ -822,7 +895,7 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
             txt += `   └ кредит вільний · ліміт ${fmtMoney(w.creditLimit)}\n`;
           }
         } else {
-          txt += `💳 <b>${w.name}</b>: ${sign}${fmtMoney(absNative)}\n`;
+          txt += `${wEmoji} <b>${w.name}</b>: ${sign}${fmtMoney(absNative)}\n`;
         }
         totalUah += w.balanceUah;
       });
@@ -1161,7 +1234,9 @@ return async function handler(req, res) {
     }
 
     if (text === '☰ Меню') {
-      await sendMessage(chatId, `📋 <b>Меню</b> — обери дію:`, { reply_markup: MENU_INLINE });
+      await sendTypingAction(chatId);
+      const panel = await buildInfoPanel(who, familyId);
+      await sendMessage(chatId, panel, { reply_markup: MENU_INLINE });
       return res.status(200).json({ ok: true });
     }
 
