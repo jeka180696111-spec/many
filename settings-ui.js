@@ -725,7 +725,7 @@ function renderSubPageBody(key) {
             <div style="width:44px;height:44px;border-radius:12px;background:#F0FDF4;color:#16A34A;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0"><i class="ti ti-shield-check"></i></div>
             <div>
               <div style="font-size:15px;font-weight:700">Політика конфіденційності</div>
-              <div style="font-size:12px;color:var(--c-text-3)">Редакція від 1 травня 2025 р.</div>
+              <div style="font-size:12px;color:var(--c-text-3)">Редакція від 1 травня 2026 р.</div>
             </div>
           </div>
           ${[
@@ -760,7 +760,7 @@ function renderSubPageBody(key) {
             <div style="width:44px;height:44px;border-radius:12px;background:#FFF7ED;color:#EA580C;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0"><i class="ti ti-file-text"></i></div>
             <div>
               <div style="font-size:15px;font-weight:700">Угода користувача</div>
-              <div style="font-size:12px;color:var(--c-text-3)">Редакція від 1 травня 2025 р.</div>
+              <div style="font-size:12px;color:var(--c-text-3)">Редакція від 1 травня 2026 р.</div>
             </div>
           </div>
           ${[
@@ -852,7 +852,7 @@ function renderSubPageBody(key) {
               💰
             </div>
             <div style="font-size:22px;font-weight:800;letter-spacing:-0.02em;margin-bottom:4px">Many Budget</div>
-            <div style="font-size:13px;color:var(--c-text-3);margin-bottom:16px">Версія 2.0.0 · Травень 2025</div>
+            <div style="font-size:13px;color:var(--c-text-3);margin-bottom:16px">Версія 2.0.0 · Травень 2026</div>
             <div style="font-size:14px;color:var(--c-text-2);line-height:1.7;max-width:300px">
               Розумний фінансовий менеджер для всієї родини з AI-аналітикою, синхронізацією та Telegram-ботом.
             </div>
@@ -926,7 +926,7 @@ function renderSubPageBody(key) {
           <div class="settings-row">
             <div class="settings-row-icon" style="background:#FEE2E2;color:#DC2626"><i class="ti ti-heart-filled"></i></div>
             <div class="settings-row-info">
-              <div class="settings-row-name">Many Budget © 2025</div>
+              <div class="settings-row-name">Many Budget © 2026</div>
               <div class="settings-row-sub">Зроблено з ❤️ для вашої родини</div>
             </div>
           </div>
