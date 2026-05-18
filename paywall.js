@@ -1,12 +1,55 @@
 // ═══════════════════════════════════════════════════════════════
-// PAYWALL — модальне вікно підписки Money Budget Pro
+// PAYWALL — модальне вікно підписки Money Budget Pro (Paddle Checkout)
 // ═══════════════════════════════════════════════════════════════
 
-import { openModal, closeModal } from './modals.js';
+import { openModal } from './modals.js';
 import { showToast } from './utils.js';
 import { state } from './config.js';
 
-async function startCheckout(plan, trial, btn) {
+let _cfg = null;
+let _ready = null;
+
+async function getConfig() {
+  if (_cfg) return _cfg;
+  const res = await fetch('/api/paddle-config');
+  if (!res.ok) throw new Error('Оплата тимчасово недоступна');
+  _cfg = await res.json();
+  return _cfg;
+}
+
+function loadPaddleScript() {
+  return new Promise((resolve, reject) => {
+    if (window.Paddle) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdn.paddle.com/paddle/v2/paddle.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Не вдалося завантажити Paddle'));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensurePaddle() {
+  if (_ready) return _ready;
+  _ready = (async () => {
+    const cfg = await getConfig();
+    await loadPaddleScript();
+    if (cfg.environment === 'sandbox') {
+      window.Paddle.Environment.set('sandbox');
+    }
+    window.Paddle.Initialize({
+      token: cfg.token,
+      eventCallback(ev) {
+        if (ev.name === 'checkout.completed') {
+          showToast('🎉 Дякуємо! Активуємо Pro…', 'success');
+        }
+      },
+    });
+    return cfg;
+  })();
+  return _ready;
+}
+
+async function startCheckout(plan, btn) {
   if (!state.familyId) {
     showToast('Спочатку увійдіть в акаунт', 'error');
     return;
@@ -14,16 +57,25 @@ async function startCheckout(plan, trial, btn) {
   const original = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pw-price">Зачекайте…</span>'; }
   try {
-    const res = await fetch('/api/stripe-checkout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ familyId: state.familyId, plan, trial: !!trial }),
+    const cfg = await ensurePaddle();
+    const priceId = cfg.prices?.[plan] || cfg.prices?.month;
+    if (!priceId) throw new Error('Цей план поки недоступний');
+
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    window.Paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      customData: { familyId: state.familyId },
+      customer: state.user?.email ? { email: state.user.email } : undefined,
+      settings: {
+        displayMode: 'overlay',
+        theme: dark ? 'dark' : 'light',
+        successUrl: location.origin + '/?pro=success',
+      },
     });
-    const data = await res.json();
-    if (!res.ok || !data.url) throw new Error(data.error || 'Помилка створення оплати');
-    window.location.href = data.url;
   } catch (e) {
     showToast(e.message || 'Не вдалося перейти до оплати', 'error');
+  } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = original; }
   }
 }
@@ -73,10 +125,7 @@ export function showPaywall(plan = 'month') {
         <span class="pw-price">${price}</span>
         <span class="pw-period">${period}</span>
       </button>
-      <button class="pw-btn-trial" id="pw-trial-btn">
-        Спробувати 7 днів безкоштовно
-      </button>
-      <div class="pw-cancel-hint">Скасувати в будь-який час</div>
+      <div class="pw-cancel-hint">7 днів безкоштовно · скасувати будь-коли</div>
     </div>
   `;
 
@@ -86,10 +135,7 @@ export function showPaywall(plan = 'month') {
     size: 'lg',
     onOpen(wrap) {
       wrap.querySelector('#pw-subscribe-btn')?.addEventListener('click', (e) => {
-        startCheckout(plan, false, e.currentTarget);
-      });
-      wrap.querySelector('#pw-trial-btn')?.addEventListener('click', (e) => {
-        startCheckout(plan, true, e.currentTarget);
+        startCheckout(plan, e.currentTarget);
       });
     },
   });

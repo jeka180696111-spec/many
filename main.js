@@ -503,7 +503,7 @@ async function bootApp() {
     setTimeout(() => import('./operations.js').then(m => m.openOperationDialog({ type: 'Дохід' })), 500);
   }
 
-  // Повернення зі Stripe Checkout
+  // Повернення з Paddle Checkout
   const proParam = new URLSearchParams(location.search).get('pro');
   if (proParam === 'success') {
     showToast('🎉 Дякуємо! Активуємо Pro…', 'success');
