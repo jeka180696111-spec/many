@@ -503,6 +503,25 @@ async function bootApp() {
     setTimeout(() => import('./operations.js').then(m => m.openOperationDialog({ type: 'Дохід' })), 500);
   }
 
+  // Повернення зі Stripe Checkout
+  const proParam = new URLSearchParams(location.search).get('pro');
+  if (proParam === 'success') {
+    showToast('🎉 Дякуємо! Активуємо Pro…', 'success');
+    (async () => {
+      for (let i = 0; i < 5; i++) {
+        try { await loadFamilyData(state.familyId); } catch {}
+        if (state.isPro) break;
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      loadDashboard();
+      if (state.isPro) showToast('✨ Pro активовано!', 'success');
+    })();
+    history.replaceState(null, '', location.pathname);
+  } else if (proParam === 'cancel') {
+    showToast('Оплату скасовано', 'error');
+    history.replaceState(null, '', location.pathname);
+  }
+
   initEdgeSwipe(openSidebar);
 
   refreshFx();

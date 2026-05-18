@@ -4,6 +4,29 @@
 
 import { openModal, closeModal } from './modals.js';
 import { showToast } from './utils.js';
+import { state } from './config.js';
+
+async function startCheckout(plan, trial, btn) {
+  if (!state.familyId) {
+    showToast('Спочатку увійдіть в акаунт', 'error');
+    return;
+  }
+  const original = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="pw-price">Зачекайте…</span>'; }
+  try {
+    const res = await fetch('/api/stripe-checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, plan, trial: !!trial }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || 'Помилка створення оплати');
+    window.location.href = data.url;
+  } catch (e) {
+    showToast(e.message || 'Не вдалося перейти до оплати', 'error');
+    if (btn) { btn.disabled = false; btn.innerHTML = original; }
+  }
+}
 
 const FEATURES = [
   { icon: 'ti-robot',          label: 'AI-помічник Фінн' },
@@ -62,13 +85,11 @@ export function showPaywall(plan = 'month') {
     sheet: true,
     size: 'lg',
     onOpen(wrap) {
-      wrap.querySelector('#pw-subscribe-btn')?.addEventListener('click', () => {
-        showToast('🚀 Переходимо до оплати...', 'success');
-        closeModal(modalId);
+      wrap.querySelector('#pw-subscribe-btn')?.addEventListener('click', (e) => {
+        startCheckout(plan, false, e.currentTarget);
       });
-      wrap.querySelector('#pw-trial-btn')?.addEventListener('click', () => {
-        showToast('🎉 7 днів Pro активовано!', 'success');
-        closeModal(modalId);
+      wrap.querySelector('#pw-trial-btn')?.addEventListener('click', (e) => {
+        startCheckout(plan, true, e.currentTarget);
       });
     },
   });
