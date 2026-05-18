@@ -541,6 +541,11 @@ async function bootApp() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initI18n();
+  // Локалізація статичного екрану входу (index.html)
+  const loginText = document.querySelector('#login-screen .auth-text');
+  if (loginText) loginText.textContent = t('Увійди через Google щоб синхронізувати дані');
+  const loginBtnSpan = document.querySelector('#google-signin-btn span');
+  if (loginBtnSpan) loginBtnSpan.textContent = t('Увійти через Google');
   initTheme();
 
   // Ініціалізуємо Firebase

@@ -5,6 +5,7 @@
 import { state } from './config.js';
 import { log, logError } from './utils.js';
 import { createUserAndFamily, joinFamilyWithCode } from './api.js';
+import { t } from './i18n.js';
 
 let _onComplete = null;
 
@@ -58,40 +59,40 @@ function renderStep1(screen) {
       <div style="text-align:center;margin-bottom:24px">
         <div class="auth-logo" style="margin:0 auto 14px">💰</div>
         <h1 style="font-size:22px;font-weight:800;color:var(--c-text);margin-bottom:4px;letter-spacing:-0.3px">Money Budget</h1>
-        <p style="font-size:13px;color:var(--c-text-2);font-weight:500">Розумний фінансовий менеджер</p>
+        <p style="font-size:13px;color:var(--c-text-2);font-weight:500">${t('Розумний фінансовий менеджер')}</p>
       </div>
 
       <!-- Ключові фічі -->
       <div class="ob-features">
         <div class="ob-feature-row">
           <div class="ob-feature-icon">🤖</div>
-          <div class="ob-feature-text"><strong>AI-аналітика</strong> — фінансовий радник Фінн допоможе контролювати витрати</div>
+          <div class="ob-feature-text"><strong>${t('AI-аналітика')}</strong> ${t('— фінансовий радник Фінн допоможе контролювати витрати')}</div>
         </div>
         <div class="ob-feature-row">
           <div class="ob-feature-icon">👨‍👩‍👧</div>
-          <div class="ob-feature-text"><strong>Сімейний бюджет</strong> — спільний облік для всієї родини в реальному часі</div>
+          <div class="ob-feature-text"><strong>${t('Сімейний бюджет')}</strong> ${t('— спільний облік для всієї родини в реальному часі')}</div>
         </div>
         <div class="ob-feature-row">
           <div class="ob-feature-icon">📱</div>
-          <div class="ob-feature-text"><strong>Telegram-бот</strong> — додавай витрати де завгодно за лічені секунди</div>
+          <div class="ob-feature-text"><strong>${t('Telegram-бот')}</strong> ${t('— додавай витрати де завгодно за лічені секунди')}</div>
         </div>
       </div>
 
       <div style="margin-bottom:20px">
-        <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">Твоє ім'я</label>
+        <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">${t("Твоє ім'я")}</label>
         <input
           id="ob-name"
           type="text"
-          placeholder="Наприклад: Євген"
+          placeholder="${t('Наприклад: Євген')}"
           maxlength="40"
           value="${escHtml(ob.userName)}"
           style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--c-border);border-radius:var(--radius);font-size:15px;font-family:inherit;background:var(--c-bg);color:var(--c-text);outline:none;transition:border-color 0.2s"
         />
-        <div id="ob-name-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">Ім'я має бути не менше 2 символів</div>
+        <div id="ob-name-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">${t("Ім'я має бути не менше 2 символів")}</div>
       </div>
 
       <div style="margin-bottom:28px">
-        <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:8px">Твій аватар</label>
+        <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:8px">${t('Твій аватар')}</label>
         <div id="ob-user-avatars" style="display:flex;flex-wrap:wrap;gap:6px">
           ${USER_AVATARS.map(a => `
             <button
@@ -103,7 +104,7 @@ function renderStep1(screen) {
         </div>
       </div>
 
-      <button id="ob-step1-next" class="btn-primary" style="width:100%">Розпочати →</button>
+      <button id="ob-step1-next" class="btn-primary" style="width:100%">${t('Розпочати →')}</button>
     </div>
   `;
 
@@ -160,32 +161,32 @@ function renderStep2(screen) {
       </div>
 
       <button id="ob-back" style="background:none;border:none;cursor:pointer;color:var(--c-text-2);font-size:13px;padding:0;margin-bottom:16px;display:flex;align-items:center;gap:4px">
-        <i class="ti ti-arrow-left"></i> Назад
+        <i class="ti ti-arrow-left"></i> ${t('Назад')}
       </button>
 
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
         <span style="font-size:28px">${ob.userAvatar}</span>
         <div>
           <h1 class="auth-title" style="margin-bottom:2px">${escHtml(ob.userName)}</h1>
-          <p style="font-size:13px;color:var(--c-text-2);margin:0">Крок 2 з 2 — Твоя родина</p>
+          <p style="font-size:13px;color:var(--c-text-2);margin:0">${t('Крок 2 з 2 — Твоя родина')}</p>
         </div>
       </div>
-      <p class="auth-text" style="margin-top:12px">Створи нову родину або приєднайся до існуючої за кодом запрошення.</p>
+      <p class="auth-text" style="margin-top:12px">${t('Створи нову родину або приєднайся до існуючої за кодом запрошення.')}</p>
 
       <!-- Вибір у вигляді карток -->
       <div class="ob-choice-cards">
         <button class="ob-choice-card${ob.activeTab === 'create' ? ' selected' : ''}" data-tab="create">
           <div class="ob-choice-card-icon">🏠</div>
           <div>
-            <div class="ob-choice-card-title">Створити нову родину</div>
-            <div class="ob-choice-card-desc">Ти станеш адміністратором і зможеш запросити інших</div>
+            <div class="ob-choice-card-title">${t('Створити нову родину')}</div>
+            <div class="ob-choice-card-desc">${t('Ти станеш адміністратором і зможеш запросити інших')}</div>
           </div>
         </button>
         <button class="ob-choice-card${ob.activeTab === 'join' ? ' selected' : ''}" data-tab="join">
           <div class="ob-choice-card-icon">🔗</div>
           <div>
-            <div class="ob-choice-card-title">Приєднатись до існуючої</div>
-            <div class="ob-choice-card-desc">Потрібен 6-символьний invite-код від адміністратора родини</div>
+            <div class="ob-choice-card-title">${t('Приєднатись до існуючої')}</div>
+            <div class="ob-choice-card-desc">${t('Потрібен 6-символьний invite-код від адміністратора родини')}</div>
           </div>
         </button>
       </div>
@@ -230,19 +231,19 @@ function renderTabContent(screen, selectedFamilyAvatar, onFamilyAvatarChange) {
 function renderCreateTab(screen, content, selectedFamilyAvatar, onFamilyAvatarChange) {
   content.innerHTML = `
     <div style="margin-bottom:20px">
-      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">Назва родини</label>
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">${t('Назва родини')}</label>
       <input
         id="ob-family-name"
         type="text"
-        placeholder="Наприклад: Ковалі"
+        placeholder="${t('Наприклад: Ковалі')}"
         maxlength="40"
         style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--c-border);border-radius:var(--radius);font-size:15px;font-family:inherit;background:var(--c-bg);color:var(--c-text);outline:none;transition:border-color 0.2s"
       />
-      <div id="ob-family-name-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">Введіть назву родини</div>
+      <div id="ob-family-name-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">${t('Введіть назву родини')}</div>
     </div>
 
     <div style="margin-bottom:28px">
-      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:8px">Аватар родини</label>
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:8px">${t('Аватар родини')}</label>
       <div id="ob-family-avatars" style="display:flex;flex-wrap:wrap;gap:6px">
         ${FAMILY_AVATARS.map(a => `
           <button
@@ -254,7 +255,7 @@ function renderCreateTab(screen, content, selectedFamilyAvatar, onFamilyAvatarCh
       </div>
     </div>
 
-    <button id="ob-create-submit" class="btn-primary" style="width:100%">Створити родину</button>
+    <button id="ob-create-submit" class="btn-primary" style="width:100%">${t('Створити родину')}</button>
   `;
 
   const nameInput = content.querySelector('#ob-family-name');
@@ -300,7 +301,7 @@ function renderCreateTab(screen, content, selectedFamilyAvatar, onFamilyAvatarCh
       if (_onComplete) _onComplete();
     } catch (e) {
       logError('createUserAndFamily', e.message);
-      errEl.textContent = 'Помилка: ' + e.message;
+      errEl.textContent = t('Помилка: ') + e.message;
       errEl.style.display = 'block';
       setLoading(screen, false);
     }
@@ -311,7 +312,7 @@ function renderCreateTab(screen, content, selectedFamilyAvatar, onFamilyAvatarCh
 function renderJoinTab(screen, content) {
   content.innerHTML = `
     <div style="margin-bottom:20px">
-      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">Код запрошення</label>
+      <label style="display:block;font-size:13px;font-weight:600;color:var(--c-text-2);margin-bottom:6px">${t('Код запрошення')}</label>
       <input
         id="ob-invite-code"
         type="text"
@@ -320,11 +321,11 @@ function renderJoinTab(screen, content) {
         autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--c-border);border-radius:var(--radius);font-size:20px;font-weight:600;letter-spacing:4px;text-transform:uppercase;text-align:center;font-family:inherit;background:var(--c-bg);color:var(--c-text);outline:none;transition:border-color 0.2s"
       />
-      <div id="ob-code-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">Введіть 6-символьний код</div>
-      <p style="font-size:12px;color:var(--c-text-3);margin-top:8px">Попроси адміністратора родини надіслати тобі 6-символьний invite-код з розділу «Налаштування».</p>
+      <div id="ob-code-err" style="display:none;color:var(--c-red,#d93025);font-size:12px;margin-top:4px">${t('Введіть 6-символьний код')}</div>
+      <p style="font-size:12px;color:var(--c-text-3);margin-top:8px">${t('Попроси адміністратора родини надіслати тобі 6-символьний invite-код з розділу «Налаштування».')}</p>
     </div>
 
-    <button id="ob-join-submit" class="btn-primary" style="width:100%">Приєднатись до родини</button>
+    <button id="ob-join-submit" class="btn-primary" style="width:100%">${t('Приєднатись до родини')}</button>
   `;
 
   const codeInput = content.querySelector('#ob-invite-code');
@@ -359,7 +360,7 @@ function renderJoinTab(screen, content) {
       if (_onComplete) _onComplete();
     } catch (e) {
       logError('joinFamilyWithCode', e.message);
-      errEl.textContent = 'Помилка: ' + e.message;
+      errEl.textContent = t('Помилка: ') + e.message;
       errEl.style.display = 'block';
       setLoading(screen, false);
     }
@@ -372,7 +373,7 @@ function setLoading(screen, loading) {
   const btns = screen.querySelectorAll('button[id$="-submit"]');
   btns.forEach(btn => {
     btn.disabled = loading;
-    btn.textContent = loading ? 'Зачекайте...' : btn.dataset.origText || btn.textContent;
+    btn.textContent = loading ? t('Зачекайте...') : btn.dataset.origText || btn.textContent;
     if (loading && !btn.dataset.origText) btn.dataset.origText = btn.textContent;
   });
 

@@ -6,6 +6,7 @@ import { state } from './config.js';
 import { log, logError } from './utils.js';
 import { getUserDoc, migrateExistingUser } from './api.js';
 import { showOnboarding } from './onboarding.js';
+import { t } from './i18n.js';
 
 // Відомі існуючі користувачі — автоматично мігруються без онбордингу
 const MIGRATION_MAP = {
@@ -26,7 +27,7 @@ export function initAuth(onSignIn) {
   firebaseAuth.getRedirectResult().catch(e => {
     if (e.code && e.code !== 'auth/no-auth-event') {
       logError('getRedirectResult', e.message);
-      showLoginError('Помилка входу: ' + e.message);
+      showLoginError(t('Помилка входу: ') + e.message);
     }
   });
 
@@ -59,7 +60,7 @@ export function initAuth(onSignIn) {
         }
       } catch (e) {
         logError('initAuth: getUserDoc failed', e.message);
-        showLoginError('Помилка завантаження профілю: ' + e.message);
+        showLoginError(t('Помилка завантаження профілю: ') + e.message);
       }
     } else {
       state.user = null;
@@ -94,7 +95,7 @@ export async function signInWithGoogle() {
       return;
     }
     logError('signInWithGoogle', e.message);
-    showLoginError('Помилка входу: ' + e.message);
+    showLoginError(t('Помилка входу: ') + e.message);
   }
 }
 
