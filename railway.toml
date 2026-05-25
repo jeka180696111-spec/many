@@ -2,12 +2,8 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "python3 -m src.main"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
-
-[environments.production.deploy]
-startCommand = "python3 -m src.main"
 
 [[volumes]]
 mountPath = "/data"
