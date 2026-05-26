@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, AliasChoices
 import base64
 import json
 
@@ -14,14 +14,23 @@ class Settings(BaseSettings):
     health_bot_token: str = Field(default="")
     devops_bot_token: str = Field(default="")
 
-    # Telethon
-    tg_api_id: int = Field(default=0)
-    tg_api_hash: str = Field(default="")
+    # Telethon — accepts TELEGRAM_API_ID or TG_API_ID
+    tg_api_id: int = Field(
+        default=0,
+        validation_alias=AliasChoices("tg_api_id", "telegram_api_id"),
+    )
+    tg_api_hash: str = Field(
+        default="",
+        validation_alias=AliasChoices("tg_api_hash", "telegram_api_hash"),
+    )
     tg_session_name: str = Field(default="family_hq_user")
     tg_phone: str = Field(default="")
 
-    # Group
-    hq_chat_id: int = Field(default=0)
+    # Group — accepts HQ_CHAT_ID or TELEGRAM_GROUP_ID
+    hq_chat_id: int = Field(
+        default=0,
+        validation_alias=AliasChoices("hq_chat_id", "telegram_group_id"),
+    )
 
     # Owners
     owner_husband_id: int = Field(default=0)
@@ -29,17 +38,29 @@ class Settings(BaseSettings):
     owner_husband_name: str = Field(default="Муж")
     owner_wife_name: str = Field(default="Жена")
 
-    # Anthropic
-    anthropic_api_key_primary: str = Field(default="")
+    # Anthropic — accepts ANTHROPIC_API_KEY_PRIMARY or ANTHROPIC_API_KEY
+    anthropic_api_key_primary: str = Field(
+        default="",
+        validation_alias=AliasChoices("anthropic_api_key_primary", "anthropic_api_key"),
+    )
     anthropic_api_key_backup: str = Field(default="")
     model_main: str = Field(default="claude-sonnet-4-5-20250929")
     model_cheap: str = Field(default="claude-haiku-4-5-20251001")
 
-    # Google
+    # Google — accepts both naming styles
     google_service_account_b64: str = Field(default="")
-    sheet_baby_id: str = Field(default="")  # Google Sheets — дневник малыша (Matveika-bot)
-    drive_backup_folder_id: str = Field(default="")
-    calendar_id: str = Field(default="")
+    sheet_baby_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("sheet_baby_id", "sheets_baby_id"),
+    )
+    drive_backup_folder_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("drive_backup_folder_id", "gdrive_backup_folder_id"),
+    )
+    calendar_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("calendar_id", "gcalendar_id"),
+    )
 
     # GitHub
     github_token: str = Field(default="")
@@ -63,6 +84,7 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
+        "populate_by_name": True,
     }
 
     @property

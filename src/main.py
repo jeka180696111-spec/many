@@ -142,6 +142,7 @@ async def handle_new_message(
 
 async def run(dry_run: bool = False) -> None:
     """Main application runner."""
+    global _shutdown_event
     settings = get_settings()
     setup_logging(settings.log_level)
 
@@ -243,7 +244,6 @@ async def run(dry_run: bool = False) -> None:
             else f"session file not found: {session_path}"
         )
         log.warning("userbot_skipped", reason=reason)
-        global _shutdown_event
         _shutdown_event = asyncio.Event()
         loop = asyncio.get_event_loop()
         for sig in (signal.SIGTERM, signal.SIGINT):
@@ -269,7 +269,6 @@ async def run(dry_run: bool = False) -> None:
     )
 
     # Graceful shutdown handler
-    global _shutdown_event
     _shutdown_event = asyncio.Event()
 
     loop = asyncio.get_event_loop()
