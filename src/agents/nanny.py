@@ -6,7 +6,7 @@ from src.agents.base import BaseAgent
 from src.db.models import FamilyMember, HealthRecord
 
 if TYPE_CHECKING:
-    from src.integrations.sheets import SheetsClient
+    from src.integrations.supabase_baby import BabyDiaryClient
     from src.db.memory import SharedMemory
 
 log = structlog.get_logger()
@@ -14,16 +14,16 @@ log = structlog.get_logger()
 class NannyAgent(BaseAgent):
     """
     Няня — tracks baby Matvey: sleep, food, medicine, development.
-    Reads/writes Google Sheets Matveika diary.
+    Reads/writes Supabase BabyDiary.
     """
 
     agent_id = "nanny"
     emoji = "🤱"
     name = "Няня"
 
-    def __init__(self, *args, sheets_client=None, **kwargs) -> None:
+    def __init__(self, *args, baby_diary=None, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self._sheets = sheets_client
+        self._baby_diary = baby_diary
 
     def get_system_prompt(self) -> str:
         from src.prompts.nanny import get_nanny_prompt
@@ -83,7 +83,7 @@ class NannyAgent(BaseAgent):
         from datetime import datetime
 
         if tool_name == "write_baby_diary":
-            if self._sheets:
+            if self._baby_diary:
                 time_str = tool_input.get("time", "now")
                 if time_str == "now":
                     dt = now_kyiv()
@@ -94,7 +94,7 @@ class NannyAgent(BaseAgent):
                     except ValueError:
                         dt = now_kyiv()
 
-                row = await self._sheets.append_baby_diary(
+                entry = await self._baby_diary.append_diary(
                     kind=tool_input.get("kind", "note"),
                     event=tool_input.get("event", ""),
                     time=dt,
@@ -102,16 +102,16 @@ class NannyAgent(BaseAgent):
                     unit=tool_input.get("unit"),
                     details=tool_input.get("details", ""),
                 )
-                return {"success": True, "row": row.row_index}
-            return {"success": True, "note": "sheets not configured"}
+                return {"success": True, "id": entry.id}
+            return {"success": True, "note": "baby_diary not configured"}
 
         elif tool_name == "read_baby_diary":
-            if self._sheets:
-                rows = await self._sheets.get_baby_diary(
+            if self._baby_diary:
+                entries = await self._baby_diary.get_diary(
                     days=tool_input.get("days", 7),
                     kind=tool_input.get("kind"),
                 )
-                return [r.data for r in rows[-20:]]
+                return [e.model_dump() for e in entries[:20]]
             return []
 
         elif tool_name == "ask_user":

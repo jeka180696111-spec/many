@@ -1,15 +1,14 @@
 from __future__ import annotations
 import json
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from src.orchestrator.dispatcher import Dispatcher, DispatchResult, AgentTask
 
 
 @pytest.fixture
 def mock_claude():
-    client = AsyncMock()
-    return client
+    return AsyncMock()
 
 
 @pytest.fixture
@@ -17,7 +16,8 @@ def dispatcher(mock_claude):
     return Dispatcher(mock_claude, "claude-haiku-4-5-20251001")
 
 
-ACTIVE_AGENTS = ["nanny", "news", "finance", "calendar", "cook", "health", "devops"]
+# 6 internal agents — Фінн is external
+ACTIVE_AGENTS = ["nanny", "news", "calendar", "cook", "health", "devops"]
 
 
 @pytest.mark.asyncio
@@ -27,6 +27,7 @@ async def test_dispatch_baby_message(dispatcher, mock_claude):
         "agents": [{"id": "nanny", "priority": "high", "reason": "запись о сне"}],
         "is_critical": False,
         "is_settings_command": False,
+        "intent": "nanny",
     })
     result = await dispatcher.dispatch("малыш уснул в 14:30", "Мама", ACTIVE_AGENTS)
     assert isinstance(result, DispatchResult)
@@ -36,36 +37,40 @@ async def test_dispatch_baby_message(dispatcher, mock_claude):
 
 
 @pytest.mark.asyncio
-async def test_dispatch_expense_message(dispatcher, mock_claude):
-    """Expense message should go to finance."""
+async def test_dispatch_expense_message_is_external(dispatcher, mock_claude):
+    """Finance message → dispatcher stays silent, Фінн handles it externally."""
     mock_claude.complete.return_value = json.dumps({
-        "agents": [{"id": "finance", "priority": "high", "reason": "трата"}],
+        "agents": [],
         "is_critical": False,
         "is_settings_command": False,
+        "intent": "finance",
     })
     result = await dispatcher.dispatch("купила подгузники за 420 грн", "Мама", ACTIVE_AGENTS)
-    assert any(t.agent_id == "finance" for t in result.tasks)
+    assert result.is_external is True
+    assert result.intent == "finance"
+    assert result.tasks == []
 
 
 @pytest.mark.asyncio
 async def test_dispatch_multi_agent(dispatcher, mock_claude):
-    """Combined message should go to multiple agents."""
+    """Combined baby+recipe message should go to nanny and cook."""
     mock_claude.complete.return_value = json.dumps({
         "agents": [
             {"id": "nanny", "priority": "high", "reason": "еда малыша"},
-            {"id": "finance", "priority": "low", "reason": "трата"},
+            {"id": "cook", "priority": "normal", "reason": "рецепт"},
         ],
         "is_critical": False,
         "is_settings_command": False,
+        "intent": "nanny",
     })
     result = await dispatcher.dispatch(
-        "купила пюре за 89 грн, дала малышу 50г",
+        "что приготовить малышу из кабачков?",
         "Мама",
         ACTIVE_AGENTS,
     )
     agent_ids = [t.agent_id for t in result.tasks]
     assert "nanny" in agent_ids
-    assert "finance" in agent_ids
+    assert "cook" in agent_ids
 
 
 @pytest.mark.asyncio
@@ -75,6 +80,7 @@ async def test_dispatch_critical_alert(dispatcher, mock_claude):
         "agents": [{"id": "news", "priority": "critical", "reason": "тревога"}],
         "is_critical": True,
         "is_settings_command": False,
+        "intent": "news",
     })
     result = await dispatcher.dispatch("тревога в одессе", "Система", ACTIVE_AGENTS)
     assert result.is_critical is True
@@ -102,9 +108,9 @@ async def test_dispatch_filters_inactive_agents(dispatcher, mock_claude):
         ],
         "is_critical": False,
         "is_settings_command": False,
+        "intent": "nanny",
     })
     result = await dispatcher.dispatch("message", "User", ACTIVE_AGENTS)
-    # housekeeper not in active list, should be filtered
     assert all(t.agent_id != "housekeeper" for t in result.tasks)
     assert any(t.agent_id == "nanny" for t in result.tasks)
 

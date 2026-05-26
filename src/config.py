@@ -6,10 +6,9 @@ import json
 
 
 class Settings(BaseSettings):
-    # Telegram bots
+    # Telegram bots (6 internal agents; Фінн is external)
     nanny_bot_token: str = Field(default="")
     news_bot_token: str = Field(default="")
-    finance_bot_token: str = Field(default="")
     calendar_bot_token: str = Field(default="")
     cook_bot_token: str = Field(default="")
     health_bot_token: str = Field(default="")
@@ -36,10 +35,13 @@ class Settings(BaseSettings):
     model_main: str = Field(default="claude-sonnet-4-5-20250929")
     model_cheap: str = Field(default="claude-haiku-4-5-20251001")
 
+    # Supabase (BabyDiary)
+    supabase_url: str = Field(default="")
+    supabase_service_role_key: str = Field(default="")
+    supabase_family_id: str = Field(default="")
+
     # Google
     google_service_account_b64: str = Field(default="")
-    sheet_baby_id: str = Field(default="")
-    sheet_finance_id: str = Field(default="")
     drive_backup_folder_id: str = Field(default="")
     calendar_id: str = Field(default="")
 
@@ -51,7 +53,6 @@ class Settings(BaseSettings):
     railway_api_token: str = Field(default="")
     railway_project_id: str = Field(default="")
     matveika_service_id: str = Field(default="")
-    finance_service_id: str = Field(default="")
 
     # App settings
     timezone: str = Field(default="Europe/Kiev")
@@ -82,7 +83,6 @@ class Settings(BaseSettings):
         mapping: dict[str, str] = {
             "nanny": self.nanny_bot_token,
             "news": self.news_bot_token,
-            "finance": self.finance_bot_token,
             "calendar": self.calendar_bot_token,
             "cook": self.cook_bot_token,
             "health": self.health_bot_token,

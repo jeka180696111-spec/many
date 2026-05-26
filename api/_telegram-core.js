@@ -14,6 +14,30 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
+// === Family HQ group integration ===
+const FAMILY_HQ_GROUP_ID = process.env.FAMILY_HQ_GROUP_ID
+  ? Number(process.env.FAMILY_HQ_GROUP_ID)
+  : null;
+
+function isFamilyHQ(chatId) {
+  return FAMILY_HQ_GROUP_ID !== null && Number(chatId) === FAMILY_HQ_GROUP_ID;
+}
+
+const FAMILY_HQ_TONE_PROMPT = `Ти — Фінн, фінансовий помічник у сімейному чаті "Сімейний Штаб".
+У цьому чаті є інші ИИ-агенти (Няня, Дозорний, Прораб, Гурман, Айболіт, Щоденник),
+ти один з них — відповідаєш за фінанси.
+
+Стиль: дружній, конкретний, з цифрами. 1-2 емодзі. Без сарказму, без образ.
+Довжина: 1-3 речення. Якщо записав операцію — підтверди коротко + одна корисна цифра
+(залишок по картці, місячна сума категорії, або порівняння з минулим тижнем).
+
+ВАЖЛИВО ПРО МОВУ: відповідай на ТІЙ ЖЕ мові, на якій написане повідомлення користувача.
+Якщо повідомлення російською — відповідай російською. Якщо українською — українською.
+Не виправляй мову користувача, не нав'язуй українську.
+
+Не лізь з коментарями якщо тебе не питали — інші агенти теж працюють у цьому чаті,
+не створюй шум.`;
+
 export default function createHandler(BOT_TOKEN) {
 
 // ── Категорії ────────────────────────────────────────────────
@@ -342,7 +366,7 @@ async function saveOperation(op) {
     desc: op.desc || '',
     who: op.who || '',
     card: op.card || '',
-    source: 'Telegram',
+    source: op.source || 'Telegram',
     createdAt: new Date().toISOString(),
   });
 }
@@ -886,7 +910,7 @@ async function handleCallback(cb, res) {
     await editMessage(chatId, messageId, txt);
     await answerCallback(cb.id, '✅ Збережено!');
 
-    if (op.type === 'Витрата') {
+    if (op.type === 'Витрата' && !isFamilyHQ(chatId)) {
       try {
         const commentMode = await getCommentMode(userId);
         if (commentMode !== 'off') {
@@ -1237,7 +1261,12 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res) {
     ]);
 
     const { messages: history, tone } = aiData;
-    const tonePrompt = TONE_PROMPTS[tone] || TONE_PROMPTS.sarcastic;
+
+    // В групповом чате игнорируем личный tone — всегда friendly без UA_ONLY
+    const tonePrompt = isFamilyHQ(chatId)
+      ? FAMILY_HQ_TONE_PROMPT
+      : (TONE_PROMPTS[tone] || TONE_PROMPTS.sarcastic);
+
     const systemPrompt = `${tonePrompt}\n\n${context}`;
 
     const messages = [...history, { role: 'user', content: userText }];
@@ -1263,6 +1292,46 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res) {
     await sendMessage(chatId, '❌ Помилка AI: ' + e.message);
   }
   return res.status(200).json({ ok: true });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FAMILY HQ GROUP HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+async function handleFamilyHQMessage(msg, res) {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text || '';
+  const tgUser = await getTelegramUser(userId);
+  if (!tgUser) return res.status(200).json({ ok: true });
+  const who = tgUser.name;
+  const familyId = tgUser.familyId;
+  if (msg.photo && msg.photo.length > 0) {
+    return handleReceiptPhoto(chatId, who, familyId, msg, res);
+  }
+  if (!text) return res.status(200).json({ ok: true });
+  const isReplyToFinn = msg.reply_to_message?.from?.username &&
+    msg.reply_to_message.from.is_bot &&
+    msg.reply_to_message.from.username.toLowerCase().includes('finn');
+  const mentionsFinn = /\b(финн|фінн|finn|@finn|казначей)\b/i.test(text);
+  const parsed = parseMessage(text);
+  const isFinancialEntry = parsed && parsed.amount && parsed.amount > 0;
+  if (!isReplyToFinn && !mentionsFinn && !isFinancialEntry) {
+    return res.status(200).json({ ok: true });
+  }
+  if (isFinancialEntry) {
+    const rates = await getExchangeRates();
+    const amountUah = parsed.currency !== 'UAH'
+      ? Math.round(parsed.amount * (rates[parsed.currency] || 1))
+      : parsed.amount;
+    const opData = { ...parsed, amountUah, who, familyId, source: 'family_hq' };
+    const pendingId = await savePending(opData, userId);
+    await sendMessage(chatId, pendingPreviewText(opData), {
+      reply_markup: buildConfirmKeyboard(pendingId, opData.type),
+    });
+    return res.status(200).json({ ok: true });
+  }
+  return handleAIChat(chatId, text, who, familyId, userId, res);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1305,6 +1374,17 @@ return async function handler(req, res) {
     const userId = msg.from.id;
     const userName = msg.from.first_name || 'User';
     const text = msg.text || '';
+
+    // ─── РЕЖИМ ГРУПИ "СІМЕЙНИЙ ШТАБ" ───────────────────────────
+    // У груповому чаті Фінн мовчить, крім випадків:
+    // 1. Пряме звернення (@finn, фінн, финн, finn, казначей)
+    // 2. Фінансове повідомлення (розпізнається parseMessage)
+    // 3. Фото чека
+    // 4. Reply на повідомлення Фінна
+    if (isFamilyHQ(chatId)) {
+      return handleFamilyHQMessage(msg, res);
+    }
+    // ────────────────────────────────────────────────────────────
 
     // ── Багатокрокова реєстрація ─────────────────────────────
     const pending = !text.startsWith('/') ? await getPendingReg(userId) : null;
@@ -1394,6 +1474,7 @@ return async function handler(req, res) {
     }
 
     if (text === '☰ Меню') {
+      if (isFamilyHQ(chatId)) return res.status(200).json({ ok: true });
       await sendTypingAction(chatId);
       const panel = await buildInfoPanel(who, familyId);
       await sendMessage(chatId, panel, { reply_markup: MENU_INLINE });

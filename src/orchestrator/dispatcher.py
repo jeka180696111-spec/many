@@ -9,20 +9,28 @@ from src.prompts.dispatcher import DISPATCHER_SYSTEM
 
 log = structlog.get_logger()
 
+EXTERNAL_AGENT = "EXTERNAL_AGENT"
+
+
 class AgentTask(BaseModel):
     agent_id: str
     priority: str  # "critical" | "high" | "normal" | "low"
     reason: str
 
+
 class DispatchResult(BaseModel):
     tasks: list[AgentTask]
     is_critical: bool = False
     is_settings_command: bool = False
+    intent: str = ""
+    is_external: bool = False
+
 
 class Dispatcher:
     """
     Determines which agents should respond to a message.
     Uses Claude Haiku for fast classification.
+    Finance intent returns is_external=True — Фінн handles it autonomously.
     """
 
     def __init__(self, claude_client: ClaudeClient, model: str) -> None:
@@ -38,6 +46,7 @@ class Dispatcher:
     ) -> DispatchResult:
         """
         Classify a message and return which agents should respond.
+        Returns is_external=True for finance intent (Фінн handles it, dispatcher stays silent).
         Falls back to ["nanny"] if classification fails.
         """
         messages = []
@@ -64,9 +73,28 @@ class Dispatcher:
                 max_tokens=512,
             )
             data = json.loads(response)
-            # Filter to only active agents
+            intent = data.get("intent", "")
+
+            # Finance → external agent (Фінн), dispatcher stays silent
+            if intent == "finance" or not data.get("agents"):
+                if intent == "finance":
+                    log.info("dispatch_external_finn", message=message_text[:50])
+                    return DispatchResult(
+                        tasks=[],
+                        is_critical=False,
+                        is_settings_command=False,
+                        intent="finance",
+                        is_external=True,
+                    )
+
+            # Filter to only active agents (JSON uses "id", model uses "agent_id")
             tasks = [
-                AgentTask(**a) for a in data.get("agents", [])
+                AgentTask(
+                    agent_id=a["id"],
+                    priority=a.get("priority", "normal"),
+                    reason=a.get("reason", ""),
+                )
+                for a in data.get("agents", [])
                 if a.get("id") in active_agent_ids
             ]
             if not tasks:
@@ -75,6 +103,8 @@ class Dispatcher:
                 tasks=tasks,
                 is_critical=data.get("is_critical", False),
                 is_settings_command=data.get("is_settings_command", False),
+                intent=intent,
+                is_external=False,
             )
         except Exception:
             log.exception("dispatch_failed", message=message_text[:50])

@@ -1,7 +1,8 @@
 """Database initialisation and seed data for Family HQ.
 
 Provides:
-    init_db() – create all tables and seed the 7 built-in agents.
+    init_db() – create all tables and seed the 6 built-in agents.
+    Фінн (finance) is an external agent and is NOT seeded here.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from .models import Agent, Base
 log = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
-# Seed data – the 7 built-in agents
+# Seed data – the 6 built-in agents
 # ---------------------------------------------------------------------------
 
 _SEED_AGENTS: list[dict[str, str]] = [
@@ -36,14 +37,6 @@ _SEED_AGENTS: list[dict[str, str]] = [
         "bot_token_env": "NEWS_BOT_TOKEN",
         "zone": "info",
         "verbosity": "proactive",
-    },
-    {
-        "agent_id": "finance",
-        "name": "Finance",
-        "emoji": "💰",
-        "bot_token_env": "FINANCE_BOT_TOKEN",
-        "zone": "finance",
-        "verbosity": "on_demand",
     },
     {
         "agent_id": "calendar",
@@ -102,7 +95,7 @@ async def init_db(db_path: str | None = None) -> AsyncEngine:
     Steps:
     1. Resolve *db_path* (env var ``DB_PATH`` → ``/data/family_hq.db``).
     2. Create all tables via ``metadata.create_all``.
-    3. Seed the 7 built-in agents if they are not already present.
+    3. Seed the 6 built-in agents if they are not already present.
     4. Return the engine so callers can create sessions from it.
     """
     resolved_path: str = db_path or os.environ.get("DB_PATH", "/data/family_hq.db")
