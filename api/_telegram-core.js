@@ -449,6 +449,7 @@ async function getTodaySameCategoryOps(familyId, who, category) {
 
 // ── AI tone ──────────────────────────────────────────────────
 const UA_ONLY = `ВАЖЛИВО: відповідай ВИКЛЮЧНО УКРАЇНСЬКОЮ МОВОЮ. Навіть якщо питання написано російською, англійською чи будь-якою іншою мовою — відповідь ТІЛЬКИ УКРАЇНСЬКОЮ. Це абсолютна вимога.`;
+const RU_ONLY = `ВАЖНО: отвечай ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ. Даже если вопрос на украинском или английском — ответ ТОЛЬКО на русском. Это абсолютное требование.`;
 
 const TONE_PROMPTS = {
   official: `Ти — Фінн, офіційний фінансовий радник сімейного бюджету.
@@ -1221,7 +1222,8 @@ async function generateSarcasticComment(op, todayOps) {
 }
 
 // ── AI Чат ───────────────────────────────────────────────────
-async function handleAIChat(chatId, userText, who, familyId, userId, res) {
+async function handleAIChat(chatId, userText, who, familyId, userId, res, opts = {}) {
+  const isHQ = !!opts.isHQ;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     await sendMessage(chatId, '❌ AI ключ не налаштований.');
@@ -1238,7 +1240,8 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res) {
 
     const { messages: history, tone } = aiData;
     const tonePrompt = TONE_PROMPTS[tone] || TONE_PROMPTS.sarcastic;
-    const systemPrompt = `${tonePrompt}\n\n${context}`;
+    const langPrompt = isHQ ? tonePrompt.replace(UA_ONLY, RU_ONLY) : tonePrompt;
+    const systemPrompt = `${langPrompt}\n\n${context}`;
 
     const messages = [...history, { role: 'user', content: userText }];
 
@@ -1413,7 +1416,7 @@ return async function handler(req, res) {
 
     const parsed = parseMessage(text);
     if (!parsed) {
-      return handleAIChat(chatId, text, who, familyId, userId, res);
+      return handleAIChat(chatId, text, who, familyId, userId, res, { isHQ: isFamilyHQGroup });
     }
 
     const rates = await getExchangeRates();
