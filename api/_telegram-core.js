@@ -1350,6 +1350,18 @@ return async function handler(req, res) {
       }
     }
 
+    // У груповому чаті "Сімейний штаб" Фінн — один з агентів. Мовчить на
+    // повідомленнях про дитину (прикорм, сон, підгузки), якщо до нього прямо
+    // не звертаються. Перевірка стоїть до реєстраційної логіки, щоб
+    // незареєстровані учасники групи не отримували спам "зареєструйся".
+    const isFamilyHQGroup = !!process.env.HQ_CHAT_ID
+      && Number(chatId) === Number(process.env.HQ_CHAT_ID);
+    const mentionsFinn = /\b(фінн|финн|finn|@finn|казначей)\b/i.test(text);
+    const isBabyFood = /\b(ч\.?\s*л\.?|ст\.?\s*л\.?|чайн\w+\s+ложк|столов\w+\s+ложк|пюре|прикорм|кабач\w+|брокколи|цветн\w+\s+капуст|банан|тыкв\w+|каш\w+\s+(дет|малыш)|грудь\s+[ЛП]|молочн\w+\s+смес|памперс|подгузник|уснул|проснулся|какал|мокрый)\b/i.test(text);
+    if (isFamilyHQGroup && isBabyFood && !mentionsFinn) {
+      return res.status(200).json({ ok: true });
+    }
+
     // ── Перевіряємо чи є зареєстрований Telegram-акаунт ─────
     const tgUser = await getTelegramUser(userId);
 
@@ -1381,6 +1393,10 @@ return async function handler(req, res) {
     }
 
     if (!tgUser) {
+      // У груповому чаті не спамити "зареєструйся" — там можуть писати інші учасники
+      if (isFamilyHQGroup) {
+        return res.status(200).json({ ok: true });
+      }
       await sendMessage(chatId, `⚠️ Ти ще не зареєстрований.\n\nНатисни /start щоб почати реєстрацію.`);
       return res.status(200).json({ ok: true });
     }
@@ -1400,17 +1416,6 @@ return async function handler(req, res) {
       await sendTypingAction(chatId);
       const panel = await buildInfoPanel(who, familyId);
       await sendMessage(chatId, panel, { reply_markup: MENU_INLINE });
-      return res.status(200).json({ ok: true });
-    }
-
-    // У груповому чаті "Сімейний штаб" Фінн — один з агентів. Мовчить на
-    // повідомленнях про дитину (прикорм, сон, підгузки), якщо до нього прямо
-    // не звертаються. Фінансові операції обробляються як зазвичай.
-    const isFamilyHQGroup = !!process.env.HQ_CHAT_ID
-      && Number(chatId) === Number(process.env.HQ_CHAT_ID);
-    const mentionsFinn = /\b(фінн|финн|finn|@finn|казначей)\b/i.test(text);
-    const isBabyFood = /\b(ч\.?\s*л\.?|ст\.?\s*л\.?|чайн\w+\s+ложк|столов\w+\s+ложк|пюре|прикорм|кабач\w+|брокколи|цветн\w+\s+капуст|банан|тыкв\w+|каш\w+\s+(дет|малыш)|грудь\s+[ЛП]|молочн\w+\s+смес|памперс|подгузник|уснул|проснулся|какал|мокрый)\b/i.test(text);
-    if (isFamilyHQGroup && isBabyFood && !mentionsFinn) {
       return res.status(200).json({ ok: true });
     }
 
