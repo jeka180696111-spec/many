@@ -1304,7 +1304,11 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res, opts =
     const tonePrompt = TONE_PROMPTS[effectiveTone] || TONE_PROMPTS.sarcastic;
     const langPrompt = isHQ ? tonePrompt.replace(UA_ONLY, RU_ONLY) : tonePrompt;
     const hqContext = isHQ ? `\n\n${HQ_TEAM_PROMPT}` : '';
-    const systemPrompt = `${langPrompt}${hqContext}\n\n${context}`;
+    // У HQ дублюємо RU_ONLY на початку і в кінці, бо TONE_PROMPTS українською
+    // і модель слідує мові оточення промпту, а не одній інструкції в середині.
+    const systemPrompt = isHQ
+      ? `${RU_ONLY}\n\n${langPrompt}${hqContext}\n\n${context}\n\n${RU_ONLY}`
+      : `${langPrompt}${hqContext}\n\n${context}`;
 
     const cleanHistory = (history || []).filter(m =>
       m && m.role && typeof m.content === 'string' && m.content.trim().length > 0
