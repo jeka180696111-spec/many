@@ -1257,12 +1257,20 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res, opts =
     });
 
     const data = await response.json();
-    const reply = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || 'Щось пішло не так 🤷';
+    const reply = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n');
+
+    if (!reply) {
+      console.error('[handleAIChat] empty reply from Anthropic:', JSON.stringify(data));
+      const errMsg = data.error?.message || data.error?.type || `HTTP ${response.status}`;
+      await sendMessage(chatId, `❌ AI не відповів: ${errMsg}`);
+      return res.status(200).json({ ok: true });
+    }
 
     saveAIHistory(userId, [...messages, { role: 'assistant', content: reply }]);
 
     await sendMessage(chatId, reply);
   } catch (e) {
+    console.error('[handleAIChat] exception:', e);
     await sendMessage(chatId, '❌ Помилка AI: ' + e.message);
   }
   return res.status(200).json({ ok: true });
