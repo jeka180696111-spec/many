@@ -1400,6 +1400,18 @@ return async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // У груповому чаті "Сімейний штаб" Фінн — один з агентів. Мовчить на
+    // повідомленнях про дитину (прикорм, сон, підгузки), якщо до нього прямо
+    // не звертаються. Фінансові операції обробляються як зазвичай.
+    const isFamilyHQGroup = typeof FAMILY_HQ_GROUP_ID !== 'undefined'
+      && FAMILY_HQ_GROUP_ID
+      && Number(chatId) === Number(FAMILY_HQ_GROUP_ID);
+    const mentionsFinn = /\b(фінн|финн|finn|@finn|казначей)\b/i.test(text);
+    const isBabyFood = /\b(ч\.?\s*л\.?|ст\.?\s*л\.?|чайн\w+\s+ложк|столов\w+\s+ложк|пюре|прикорм|кабач\w+|брокколи|цветн\w+\s+капуст|банан|тыкв\w+|каш\w+\s+(дет|малыш)|грудь\s+[ЛП]|молочн\w+\s+смес|памперс|подгузник|уснул|проснулся|какал|мокрый)\b/i.test(text);
+    if (isFamilyHQGroup && isBabyFood && !mentionsFinn) {
+      return res.status(200).json({ ok: true });
+    }
+
     const parsed = parseMessage(text);
     if (!parsed) {
       return handleAIChat(chatId, text, who, familyId, userId, res);
