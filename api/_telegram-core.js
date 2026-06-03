@@ -1241,9 +1241,17 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res, opts =
     const { messages: history, tone } = aiData;
     const tonePrompt = TONE_PROMPTS[tone] || TONE_PROMPTS.sarcastic;
     const langPrompt = isHQ ? tonePrompt.replace(UA_ONLY, RU_ONLY) : tonePrompt;
-    const systemPrompt = `${langPrompt}\n\n${context}`;
+    const hqContext = isHQ ? `\n\nКОНТЕКСТ ЧАТА: Это групповой чат "Семейный Штаб", где работают несколько AI-ассистентов:
+- Няня — отвечает на вопросы про ребёнка (прикорм, сон, развитие, здоровье малыша).
+- Гурман — кулинария, рецепты, еда для взрослых.
+- Ты (Фінн) — финансы семьи: расходы, доходы, бюджет, советы по экономии.
+Не лезь в чужие зоны: про детское питание и сон молчи (это Няня), про рецепты — Гурман. Свою финансовую работу делай как обычно. Если к тебе обращаются по имени — отвечай.` : '';
+    const systemPrompt = `${langPrompt}${hqContext}\n\n${context}`;
 
-    const messages = [...history, { role: 'user', content: userText }];
+    const cleanHistory = (history || []).filter(m =>
+      m && m.role && typeof m.content === 'string' && m.content.trim().length > 0
+    );
+    const messages = [...cleanHistory, { role: 'user', content: userText }];
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
