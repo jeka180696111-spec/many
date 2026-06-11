@@ -1257,31 +1257,90 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
   }
 }
 
+// ── LLM провайдери: Gemini (основний) → Anthropic (фолбек) ──
+const GEMINI_MODEL = 'gemini-2.0-flash';
+
+function getLLMKeys() {
+  const gemini = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
+    .filter(k => k && k.trim().length > 0);
+  return { gemini, anthropic: process.env.ANTHROPIC_API_KEY || null };
+}
+
+async function callGemini(systemPrompt, messages, apiKey, opts = {}) {
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: typeof m.content === 'string' ? m.content : String(m.content) }],
+  }));
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: { maxOutputTokens: opts.maxTokens || 500, temperature: opts.temperature ?? 0.7 },
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(`Gemini ${response.status}: ${data.error?.message || 'unknown'}`);
+  }
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n');
+  if (!text) throw new Error('Gemini empty response');
+  return text;
+}
+
+async function callAnthropic(systemPrompt, messages, apiKey, opts = {}) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: opts.model || 'claude-haiku-4-5-20251001',
+      max_tokens: opts.maxTokens || 500,
+      system: systemPrompt,
+      messages,
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(`Anthropic ${response.status}: ${data.error?.message || data.error?.type || 'unknown'}`);
+  }
+  const text = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n');
+  if (!text) throw new Error('Anthropic empty response');
+  return text;
+}
+
+async function callLLM(systemPrompt, messages, opts = {}) {
+  const { gemini, anthropic } = getLLMKeys();
+  const errors = [];
+  for (const key of gemini) {
+    try { return await callGemini(systemPrompt, messages, key, opts); }
+    catch (e) { errors.push(`gemini: ${e.message}`); console.warn('[callLLM] gemini fail:', e.message); }
+  }
+  if (anthropic) {
+    try { return await callAnthropic(systemPrompt, messages, anthropic, opts); }
+    catch (e) { errors.push(`anthropic: ${e.message}`); console.warn('[callLLM] anthropic fail:', e.message); }
+  }
+  throw new Error(errors.join(' | ') || 'no LLM key configured');
+}
+
 // ── Проактивні саркастичні коментарі ────────────────────────
 async function generateSarcasticComment(op, todayOps) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
+  const { gemini, anthropic } = getLLMKeys();
+  if (gemini.length === 0 && !anthropic) return null;
 
   const totalToday = todayOps.reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
   const count = todayOps.length;
   const stores = todayOps.map(o => o.desc).filter(Boolean).join(', ');
   const context = `${op.who} щойно зробив ${count}-у витрату сьогодні в категорії "${op.category}": ${op.amount} ₴${op.desc ? ` (${op.desc})` : ''}. Всього сьогодні в цій категорії: ${fmtMoney(totalToday)}${stores ? `. Місця: ${stores}` : ''}.`;
 
+  const systemPrompt = `Ти — саркастичний фінансовий радник на ім'я Фінн. Стиль: їдкий гумор, але з теплотою.
+Правила: УКРАЇНСЬКА, ДУЖЕ коротко (1-2 речення), один дотепний коментар про повторну витрату за день у тій самій категорії. 1-2 емодзі максимум. Не запитуй питань. Не повторюй факти дослівно.`;
+
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 120,
-        system: `Ти — саркастичний фінансовий радник на ім'я Фінн. Стиль: їдкий гумор, але з теплотою.
-Правила: УКРАЇНСЬКА, ДУЖЕ коротко (1-2 речення), один дотепний коментар про повторну витрату за день у тій самій категорії. 1-2 емодзі максимум. Не запитуй питань. Не повторюй факти дослівно.`,
-        messages: [{ role: 'user', content: context }],
-      }),
-    });
-    const data = await response.json();
-    return data.content?.filter(c => c.type === 'text').map(c => c.text).join('') || null;
+    return await callLLM(systemPrompt, [{ role: 'user', content: context }], { maxTokens: 120 });
   } catch (e) {
+    console.warn('[generateSarcasticComment]', e.message);
     return null;
   }
 }
@@ -1289,8 +1348,8 @@ async function generateSarcasticComment(op, todayOps) {
 // ── AI Чат ───────────────────────────────────────────────────
 async function handleAIChat(chatId, userText, who, familyId, userId, res, opts = {}) {
   const isHQ = !!opts.isHQ;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const { gemini, anthropic } = getLLMKeys();
+  if (gemini.length === 0 && !anthropic) {
     await sendMessage(chatId, '❌ AI ключ не налаштований.');
     return res.status(200).json({ ok: true });
   }
@@ -1320,24 +1379,12 @@ async function handleAIChat(chatId, userText, who, familyId, userId, res, opts =
     );
     const messages = [...cleanHistory, { role: 'user', content: userText }];
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 500,
-        system: systemPrompt,
-        messages,
-      }),
-    });
-
-    const data = await response.json();
-    const reply = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n');
-
-    if (!reply) {
-      console.error('[handleAIChat] empty reply from Anthropic:', JSON.stringify(data));
-      const errMsg = data.error?.message || data.error?.type || `HTTP ${response.status}`;
-      await sendMessage(chatId, `❌ AI не відповів: ${errMsg}`);
+    let reply;
+    try {
+      reply = await callLLM(systemPrompt, messages, { maxTokens: 500 });
+    } catch (e) {
+      console.error('[handleAIChat] LLM error:', e.message);
+      await sendMessage(chatId, `❌ AI не відповів: ${e.message}`);
       return res.status(200).json({ ok: true });
     }
 
