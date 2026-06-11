@@ -1258,7 +1258,7 @@ async function handleCommand(cmd, chatId, userId, userName, who, familyId, res) 
 }
 
 // ── LLM провайдери: Gemini (основний) → Anthropic (фолбек) ──
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 function getLLMKeys() {
   const gemini = [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2]
