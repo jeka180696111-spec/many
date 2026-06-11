@@ -195,56 +195,28 @@ async function getExchangeRates() {
   return { USD: 41.5, EUR: 45.0 };
 }
 
-// ── Claude vision — аналіз фото чека ───────────────────────
+// ── Vision: аналіз фото чека (Claude → Gemini фолбек) ─────
 async function analyzeReceiptWithClaude(base64Image) {
+  const systemPrompt = 'Ти помічник для розпізнавання чеків. Повертай тільки валідний JSON без пояснень.';
+  const promptText = 'Це фото чека або квитанції. Витягни дані та поверни ТІЛЬКИ JSON без пояснень:\n{"amount": <число без валюти>, "store": "<назва магазину>", "date": "<YYYY-MM-DD або null>", "category": "<одна з: Продукти, Ресторани, Транспорт, Комунальні, Здоров\'я, Одяг, Розваги, Дім, Дитячі, Інше>"}\nЯкщо не можеш прочитати - поверни {"error": "не вдалося розпізнати"}';
+
+  let text;
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 256,
-        system: 'Ти помічник для розпізнавання чеків. Повертай тільки валідний JSON без пояснень.',
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: {
-                  type: 'base64',
-                  media_type: 'image/jpeg',
-                  data: base64Image,
-                },
-              },
-              {
-                type: 'text',
-                text: 'Це фото чека або квитанції. Витягни дані та поверни ТІЛЬКИ JSON без пояснень:\n{"amount": <число без валюти>, "store": "<назва магазину>", "date": "<YYYY-MM-DD або null>", "category": "<одна з: Продукти, Ресторани, Транспорт, Комунальні, Здоров\'я, Одяг, Розваги, Дім, Дитячі, Інше>"}\nЯкщо не можеш прочитати - поверни {"error": "не вдалося розпізнати"}',
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const text = (data.content?.[0]?.text || '').trim();
-
-    try {
-      return JSON.parse(text);
-    } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) return JSON.parse(match[0]);
-      return null;
-    }
+    text = await callLLMVision(systemPrompt, promptText, base64Image);
   } catch (e) {
-    console.error('analyzeReceiptWithClaude error:', e);
+    console.error('analyzeReceiptWithClaude error:', e.message);
+    return null;
+  }
+
+  // Gemini іноді обгортає JSON у ```json ... ```
+  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try { return JSON.parse(match[0]); } catch { return null; }
+    }
     return null;
   }
 }
@@ -1313,13 +1285,80 @@ async function callAnthropic(systemPrompt, messages, apiKey, opts = {}) {
 async function callLLM(systemPrompt, messages, opts = {}) {
   const { gemini, anthropic } = getLLMKeys();
   const errors = [];
+  if (anthropic) {
+    try { return await callAnthropic(systemPrompt, messages, anthropic, opts); }
+    catch (e) { errors.push(`anthropic: ${e.message}`); console.warn('[callLLM] anthropic fail:', e.message); }
+  }
   for (const key of gemini) {
     try { return await callGemini(systemPrompt, messages, key, opts); }
     catch (e) { errors.push(`gemini: ${e.message}`); console.warn('[callLLM] gemini fail:', e.message); }
   }
+  throw new Error(errors.join(' | ') || 'no LLM key configured');
+}
+
+// ── Vision: розпізнавання чека з фолбеком Claude → Gemini ──
+async function callAnthropicVision(systemPrompt, promptText, base64Image, apiKey) {
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      system: systemPrompt,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
+          { type: 'text', text: promptText },
+        ],
+      }],
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(`Anthropic vision ${response.status}: ${data.error?.message || data.error?.type || 'unknown'}`);
+  }
+  const text = (data.content?.[0]?.text || '').trim();
+  if (!text) throw new Error('Anthropic vision empty response');
+  return text;
+}
+
+async function callGeminiVision(systemPrompt, promptText, base64Image, apiKey) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{
+        role: 'user',
+        parts: [
+          { inline_data: { mime_type: 'image/jpeg', data: base64Image } },
+          { text: promptText },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 256, temperature: 0.2 },
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(`Gemini vision ${response.status}: ${data.error?.message || 'unknown'}`);
+  }
+  const text = data.candidates?.[0]?.content?.parts?.map(p => p.text).filter(Boolean).join('\n')?.trim();
+  if (!text) throw new Error('Gemini vision empty response');
+  return text;
+}
+
+async function callLLMVision(systemPrompt, promptText, base64Image) {
+  const { gemini, anthropic } = getLLMKeys();
+  const errors = [];
   if (anthropic) {
-    try { return await callAnthropic(systemPrompt, messages, anthropic, opts); }
-    catch (e) { errors.push(`anthropic: ${e.message}`); console.warn('[callLLM] anthropic fail:', e.message); }
+    try { return await callAnthropicVision(systemPrompt, promptText, base64Image, anthropic); }
+    catch (e) { errors.push(`anthropic: ${e.message}`); console.warn('[callLLMVision] anthropic fail:', e.message); }
+  }
+  for (const key of gemini) {
+    try { return await callGeminiVision(systemPrompt, promptText, base64Image, key); }
+    catch (e) { errors.push(`gemini: ${e.message}`); console.warn('[callLLMVision] gemini fail:', e.message); }
   }
   throw new Error(errors.join(' | ') || 'no LLM key configured');
 }
