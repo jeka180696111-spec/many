@@ -1483,8 +1483,14 @@ return async function handler(req, res) {
     const userName = msg.from.first_name || 'User';
     const text = msg.text || '';
 
+    // У груповому чаті HQ Фінн не веде реєстраційний діалог — реєстрація
+    // тільки в особистих повідомленнях. Інакше будь-який текст учасника
+    // групи (у якого є pendingReg з ЛС) тлумачиться як код.
+    const isFamilyHQGroupEarly = !!process.env.HQ_CHAT_ID
+      && Number(chatId) === Number(process.env.HQ_CHAT_ID);
+
     // ── Багатокрокова реєстрація ─────────────────────────────
-    const pending = !text.startsWith('/') ? await getPendingReg(userId) : null;
+    const pending = !text.startsWith('/') && !isFamilyHQGroupEarly ? await getPendingReg(userId) : null;
     if (pending) {
       if (pending.step === 'name') {
         const name = text.trim().substring(0, 30);
