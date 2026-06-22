@@ -149,7 +149,7 @@
 .dash-drag-handle {
   cursor: grab;
   color: var(--c-text-3);
-  opacity: 0;
+  opacity: 0.55;
   transition: opacity .15s;
   padding: 0 2px;
   display: flex;
@@ -160,7 +160,30 @@
 .dash-card:hover .dash-drag-handle,
 .dash-card.dash-dragging .dash-drag-handle { opacity: 1; }
 @media (max-width: 768px) {
-  .dash-drag-handle { opacity: 0.4; }
+  .dash-drag-handle { opacity: 0.7; }
+}
+
+/* Кнопка згортання картки */
+.dash-card-collapse {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--c-text-3);
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: background .15s, color .15s;
+  font-size: 16px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.dash-card-collapse:hover { background: var(--c-surface-2); color: var(--c-text-1); }
+.dash-card-collapse .ti { transition: transform .2s ease; }
+.dash-card[data-collapsed="true"] .dash-card-collapse .ti { transform: rotate(-90deg); }
+.dash-card[data-collapsed="true"] > *:not(.dash-card-head) { display: none !important; }
+.dash-card[data-collapsed="true"] {
+  padding-bottom: 0 !important;
 }
 .dash-card.dash-dragging {
   opacity: 0.5;

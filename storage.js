@@ -203,6 +203,20 @@ export function getDashCardOrder() {
 }
 export function setDashCardOrder(order) {
   localStorage.setItem('budget_dash_card_order', JSON.stringify(order));
+  markDirty('budget_dash_card_order');
+}
+
+// ── Згорнуті віджети на дашборді (масив id) ─────────────────
+export function getDashCollapsed() {
+  try {
+    const s = localStorage.getItem('budget_dash_collapsed');
+    return s ? JSON.parse(s) : [];
+  } catch { return []; }
+}
+export function setDashCollapsed(arr) {
+  const uniq = Array.from(new Set(arr || []));
+  localStorage.setItem('budget_dash_collapsed', JSON.stringify(uniq));
+  markDirty('budget_dash_collapsed');
 }
 
 // ── Ім'я користувача та аватар ──────────────────────────────

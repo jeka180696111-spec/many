@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { FAMILY_MEMBERS, state } from './config.js';
-import { getCards, getProfiles, getWalletTypeById, getFamilyName, getVisibleWallets, setVisibleWallets, getViewAsMember, getCategoryLimits, getSpendingPlan, getDashWidgets, getDashCardOrder, setDashCardOrder } from './storage.js';
+import { getCards, getProfiles, getWalletTypeById, getFamilyName, getVisibleWallets, setVisibleWallets, getViewAsMember, getCategoryLimits, getSpendingPlan, getDashWidgets, getDashCardOrder, setDashCardOrder, getDashCollapsed, setDashCollapsed } from './storage.js';
 import { apiGet } from './api.js';
 import { esc, fmtMoney, fmtMoneyShort, fmtMoneyWithUah, setText, fmtDate, log, showToast } from './utils.js';
 import { openOperationDialog } from './operations.js';
@@ -394,15 +394,55 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   return sortedIds.map(id => widgets[id] || '').join('');
 }
 
+// ── Інжект кнопки згортання + застосування збереженого стану ──
+function setupCollapseButtons(grid) {
+  const collapsed = new Set(getDashCollapsed());
+  const cards = [...grid.querySelectorAll('[data-widget]')];
+  cards.forEach(card => {
+    const id = card.dataset.widget;
+    const head = card.querySelector('.dash-card-head');
+    if (!head) return;
+    if (collapsed.has(id)) card.setAttribute('data-collapsed', 'true');
+    if (!head.querySelector('.dash-card-collapse')) {
+      const btn = document.createElement('button');
+      btn.className = 'dash-card-collapse';
+      btn.type = 'button';
+      btn.title = 'Згорнути / розгорнути';
+      btn.innerHTML = '<i class="ti ti-chevron-down"></i>';
+      head.appendChild(btn);
+    }
+  });
+
+  grid.addEventListener('click', e => {
+    const btn = e.target.closest('.dash-card-collapse');
+    if (!btn) return;
+    e.stopPropagation();
+    const card = btn.closest('[data-widget]');
+    if (!card) return;
+    const id = card.dataset.widget;
+    const isCollapsed = card.getAttribute('data-collapsed') === 'true';
+    if (isCollapsed) card.removeAttribute('data-collapsed');
+    else card.setAttribute('data-collapsed', 'true');
+    const next = [...grid.querySelectorAll('[data-widget][data-collapsed="true"]')].map(c => c.dataset.widget);
+    setDashCollapsed(next);
+    import('./api.js').then(m => m.syncSettingsToSheet?.());
+  });
+}
+
 // ── Drag-and-drop сортування ───────────────────────────────
 export function initDashSortable(el) {
   const grid = el.querySelector('#dash-sortable-grid');
   if (!grid) return;
 
+  setupCollapseButtons(grid);
+
   let dragSrc = null;
 
   function cards() { return [...grid.querySelectorAll('[data-widget]')]; }
-  function saveOrder() { setDashCardOrder(cards().map(c => c.dataset.widget)); }
+  function saveOrder() {
+    setDashCardOrder(cards().map(c => c.dataset.widget));
+    import('./api.js').then(m => m.syncSettingsToSheet?.());
+  }
   function getCard(target) { return target?.closest('[data-widget]'); }
   function swap(src, tgt) {
     if (!src || !tgt || src === tgt) return;

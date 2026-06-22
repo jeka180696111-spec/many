@@ -486,6 +486,8 @@ async function updateSettings(body) {
   if (body.profiles !== undefined) data.profiles = body.profiles;
   if (body.categoryLimits !== undefined) data.categoryLimits = body.categoryLimits;
   if (body.spendingPlan !== undefined) data.spendingPlan = body.spendingPlan;
+  if (body.dashCardOrder !== undefined) data.dashCardOrder = body.dashCardOrder;
+  if (body.dashCollapsed !== undefined) data.dashCollapsed = body.dashCollapsed;
   data.updatedAt = new Date().toISOString();
 
   await familyRef().set(data, { merge: true });
@@ -543,7 +545,7 @@ export async function syncSettingsToSheet() {
 
   syncInFlight = (async () => {
     try {
-      const { getCategoryLimits, getSpendingPlan } = await import('./storage.js');
+      const { getCategoryLimits, getSpendingPlan, getDashCardOrder, getDashCollapsed } = await import('./storage.js');
       await updateSettings({
         action: 'updateSettings',
         familyName: getFamilyName(),
@@ -555,6 +557,8 @@ export async function syncSettingsToSheet() {
         profiles: getProfiles(),
         categoryLimits: getCategoryLimits(),
         spendingPlan: getSpendingPlan(),
+        dashCardOrder: getDashCardOrder(),
+        dashCollapsed: getDashCollapsed(),
       });
       syncState.pendingSettings = false;
       log('settings synced to Firestore');
@@ -590,7 +594,8 @@ export async function loadSettingsFromFirestore() {
 
     const { setExpCats, setIncCats, setCards, setWalletTypes,
             setProfiles, setFamilyName,
-            setCategoryLimits, setSpendingPlan } = await import('./storage.js');
+            setCategoryLimits, setSpendingPlan,
+            setDashCardOrder, setDashCollapsed } = await import('./storage.js');
 
     if (data.expCats && Array.isArray(data.expCats)) setExpCats(data.expCats);
     if (data.incCats && Array.isArray(data.incCats)) setIncCats(data.incCats);
@@ -601,6 +606,8 @@ export async function loadSettingsFromFirestore() {
     if (data.familyName) setFamilyName(data.familyName);
     if (data.categoryLimits && typeof data.categoryLimits === 'object') setCategoryLimits(data.categoryLimits);
     if (data.spendingPlan && typeof data.spendingPlan === 'object') setSpendingPlan(data.spendingPlan);
+    if (Array.isArray(data.dashCardOrder)) setDashCardOrder(data.dashCardOrder);
+    if (Array.isArray(data.dashCollapsed)) setDashCollapsed(data.dashCollapsed);
 
     log('settings loaded from Firestore');
   } catch (e) {
