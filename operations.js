@@ -357,7 +357,14 @@ export function openOperationDialog(opts = {}) {
     });
 
     // Save
-    wrap.querySelector('#' + saveId)?.addEventListener('click', async () => {
+    // ВАЖЛИВО: ця кнопка живе у footer модала, який НЕ перерендериться при
+    // зміні типу/категорії/валюти. А bindHandlers викликається на кожному
+    // rerender — без гарду додавався би новий click-listener щоразу, і
+    // один клік створював би N операцій. dataset-флаг захищає від цього.
+    const saveBtn = wrap.querySelector('#' + saveId);
+    if (saveBtn && !saveBtn.dataset.bound) {
+      saveBtn.dataset.bound = '1';
+      saveBtn.addEventListener('click', async () => {
       const amt  = parseFloat(wrap.querySelector('#' + amtId)?.value || 0);
       const desc = wrap.querySelector('#' + descId)?.value?.trim() || '';
       const dt   = wrap.querySelector('#' + dateId)?.value;
@@ -436,20 +443,25 @@ export function openOperationDialog(opts = {}) {
         btn.disabled = false;
         btn.textContent = isEdit ? 'Зберегти' : 'Додати';
       }
-    });
+      });
+    }
 
-    // Delete
-    wrap.querySelector('#' + delId)?.addEventListener('click', async () => {
-      const ok = await import('./modals.js').then(m => m.confirmModal('Видалити операцію?', { danger: true, okText: 'Видалити' }));
-      if (!ok) return;
-      try {
-        await apiPost({ action: 'deleteOperation', row: editing.row || editing.id });
-        closeModal(modalId);
-        showToast('Видалено');
-        import('./operations-list.js').then(m => m.loadOperations());
-        if (window.refreshDashboard) window.refreshDashboard();
-      } catch (e) { showToast('Помилка: ' + e.message, 'error'); }
-    });
+    // Delete — той самий гард, кнопка теж у footer і не пересоздається.
+    const delBtn = wrap.querySelector('#' + delId);
+    if (delBtn && !delBtn.dataset.bound) {
+      delBtn.dataset.bound = '1';
+      delBtn.addEventListener('click', async () => {
+        const ok = await import('./modals.js').then(m => m.confirmModal('Видалити операцію?', { danger: true, okText: 'Видалити' }));
+        if (!ok) return;
+        try {
+          await apiPost({ action: 'deleteOperation', row: editing.row || editing.id });
+          closeModal(modalId);
+          showToast('Видалено');
+          import('./operations-list.js').then(m => m.loadOperations());
+          if (window.refreshDashboard) window.refreshDashboard();
+        } catch (e) { showToast('Помилка: ' + e.message, 'error'); }
+      });
+    }
   }
 
   return modalId;
