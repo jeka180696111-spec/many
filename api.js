@@ -477,7 +477,15 @@ async function addReserveOp(body) {
 // ── Зберегти налаштування ────────────────────────────────────
 async function updateSettings(body) {
   const data = {};
-  if (body.familyName !== undefined) data.familyName = body.familyName;
+  if (body.familyName !== undefined) {
+    // Дублюємо у 'name' для сумісності з createUserAndFamily.
+    data.familyName = body.familyName;
+    data.name = body.familyName;
+  }
+  if (body.familyAvatar !== undefined) {
+    data.familyAvatar = body.familyAvatar;
+    data.avatar = body.familyAvatar;
+  }
   if (body.expCats !== undefined) data.expCats = body.expCats;
   if (body.incCats !== undefined) data.incCats = body.incCats;
   if (body.cardsEvgen !== undefined) data.cardsEvgen = body.cardsEvgen;
@@ -488,6 +496,7 @@ async function updateSettings(body) {
   if (body.spendingPlan !== undefined) data.spendingPlan = body.spendingPlan;
   if (body.dashCardOrder !== undefined) data.dashCardOrder = body.dashCardOrder;
   if (body.dashCollapsed !== undefined) data.dashCollapsed = body.dashCollapsed;
+  if (body.dashWidgets !== undefined) data.dashWidgets = body.dashWidgets;
   data.updatedAt = new Date().toISOString();
 
   await familyRef().set(data, { merge: true });
@@ -545,10 +554,11 @@ export async function syncSettingsToSheet() {
 
   syncInFlight = (async () => {
     try {
-      const { getCategoryLimits, getSpendingPlan, getDashCardOrder, getDashCollapsed } = await import('./storage.js');
+      const { getCategoryLimits, getSpendingPlan, getDashCardOrder, getDashCollapsed, getDashWidgets, getFamilyAvatar } = await import('./storage.js');
       await updateSettings({
         action: 'updateSettings',
         familyName: getFamilyName(),
+        familyAvatar: getFamilyAvatar(),
         expCats: getExpCats(),
         incCats: getIncCats(),
         cardsEvgen: getCards('Євген'),
@@ -559,6 +569,7 @@ export async function syncSettingsToSheet() {
         spendingPlan: getSpendingPlan(),
         dashCardOrder: getDashCardOrder(),
         dashCollapsed: getDashCollapsed(),
+        dashWidgets: getDashWidgets(),
       });
       syncState.pendingSettings = false;
       log('settings synced to Firestore');
@@ -593,9 +604,9 @@ export async function loadSettingsFromFirestore() {
     if (!data) return;
 
     const { setExpCats, setIncCats, setCards, setWalletTypes,
-            setProfiles, setFamilyName,
+            setProfiles, setFamilyName, setFamilyAvatar,
             setCategoryLimits, setSpendingPlan,
-            setDashCardOrder, setDashCollapsed } = await import('./storage.js');
+            setDashCardOrder, setDashCollapsed, setDashWidgets } = await import('./storage.js');
 
     if (data.expCats && Array.isArray(data.expCats)) setExpCats(data.expCats);
     if (data.incCats && Array.isArray(data.incCats)) setIncCats(data.incCats);
@@ -603,11 +614,16 @@ export async function loadSettingsFromFirestore() {
     if (data.cardsMarina && Array.isArray(data.cardsMarina)) setCards(data.cardsMarina, 'Марина');
     if (data.walletTypes && Array.isArray(data.walletTypes)) setWalletTypes(data.walletTypes);
     if (data.profiles) setProfiles(data.profiles);
-    if (data.familyName) setFamilyName(data.familyName);
+    // Назва родини: новий поле familyName має пріоритет, fallback на 'name' з онбордингу.
+    const famName = data.familyName || data.name;
+    if (famName) setFamilyName(famName);
+    const famAvatar = data.familyAvatar || data.avatar;
+    if (famAvatar) setFamilyAvatar(famAvatar);
     if (data.categoryLimits && typeof data.categoryLimits === 'object') setCategoryLimits(data.categoryLimits);
     if (data.spendingPlan && typeof data.spendingPlan === 'object') setSpendingPlan(data.spendingPlan);
     if (Array.isArray(data.dashCardOrder)) setDashCardOrder(data.dashCardOrder);
     if (Array.isArray(data.dashCollapsed)) setDashCollapsed(data.dashCollapsed);
+    if (data.dashWidgets && typeof data.dashWidgets === 'object') setDashWidgets(data.dashWidgets);
 
     log('settings loaded from Firestore');
   } catch (e) {

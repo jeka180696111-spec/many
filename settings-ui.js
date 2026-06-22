@@ -1294,6 +1294,7 @@ function bindSettingsHandlers(el) {
       const widgets = getDashWidgets();
       widgets[inp.dataset.widget] = inp.checked;
       setDashWidgets(widgets);
+      syncSettingsToSheet();
     });
   });
 
@@ -1302,6 +1303,7 @@ function bindSettingsHandlers(el) {
     btn.addEventListener('click', () => {
       const emoji = btn.dataset.famEmoji;
       setFamilyAvatar(emoji);
+      syncSettingsToSheet();
       el.querySelectorAll('[data-fam-emoji]').forEach(b => {
         const active = b.dataset.famEmoji === emoji;
         b.style.borderColor = active ? 'var(--c-accent)' : 'transparent';
@@ -1321,6 +1323,7 @@ function bindSettingsHandlers(el) {
     try {
       const dataUrl = await compressImage(file, 256);
       setFamilyAvatar(dataUrl);
+      syncSettingsToSheet();
       const img = el.querySelector('#family-avatar-img');
       if (img) img.outerHTML = `<img id="family-avatar-img" src="${dataUrl}" style="width:80px;height:80px;border-radius:20px;object-fit:cover;border:3px solid var(--c-accent)">`;
       if (window.renderSidebarPublic) window.renderSidebarPublic();
@@ -1331,6 +1334,7 @@ function bindSettingsHandlers(el) {
   // Remove family avatar
   el.querySelector('#remove-family-avatar-btn')?.addEventListener('click', () => {
     setFamilyAvatar('');
+    syncSettingsToSheet();
     if (window.renderSidebarPublic) window.renderSidebarPublic();
     renderSettingsPage();
     showToast('Іконку скинуто');
