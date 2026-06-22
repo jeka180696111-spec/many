@@ -217,6 +217,7 @@ function openAddBudgetItem(type) {
         const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
         d[selectedKey] = amt;
         if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+        syncSettingsToSheet();
         closeModal(modalId);
         renderSettingsPage();
         showToast('✅ Додано');
@@ -237,6 +238,7 @@ function openEditBudgetItem(type, key, currentAmount) {
     const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
     d[key] = amt;
     if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+    syncSettingsToSheet();
     renderSettingsPage();
     showToast('✅ Збережено');
   });
@@ -1621,6 +1623,7 @@ function bindSettingsHandlers(el) {
       const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
       delete d[key];
       if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+      syncSettingsToSheet();
       renderSettingsPage();
     });
   });
