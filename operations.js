@@ -224,6 +224,7 @@ export function openOperationDialog(opts = {}) {
     onOpen: (wrap) => {
       setTimeout(() => wrap.querySelector('#' + amtId)?.focus(), 200);
       bindHandlers(wrap);
+      bindFooterButtons(wrap);
     },
   });
 
@@ -356,14 +357,13 @@ export function openOperationDialog(opts = {}) {
       });
     });
 
-    // Save
-    // ВАЖЛИВО: ця кнопка живе у footer модала, який НЕ перерендериться при
-    // зміні типу/категорії/валюти. А bindHandlers викликається на кожному
-    // rerender — без гарду додавався би новий click-listener щоразу, і
-    // один клік створював би N операцій. dataset-флаг захищає від цього.
+  }
+
+  // ── Save / Delete живуть у footer і вішаються РАЗ на життя модала.
+  // Окремо від bindHandlers, який смикають на кожному rerender форми.
+  function bindFooterButtons(wrap) {
     const saveBtn = wrap.querySelector('#' + saveId);
-    if (saveBtn && !saveBtn.dataset.bound) {
-      saveBtn.dataset.bound = '1';
+    if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
       const amt  = parseFloat(wrap.querySelector('#' + amtId)?.value || 0);
       const desc = wrap.querySelector('#' + descId)?.value?.trim() || '';
@@ -446,10 +446,8 @@ export function openOperationDialog(opts = {}) {
       });
     }
 
-    // Delete — той самий гард, кнопка теж у footer і не пересоздається.
     const delBtn = wrap.querySelector('#' + delId);
-    if (delBtn && !delBtn.dataset.bound) {
-      delBtn.dataset.bound = '1';
+    if (delBtn) {
       delBtn.addEventListener('click', async () => {
         const ok = await import('./modals.js').then(m => m.confirmModal('Видалити операцію?', { danger: true, okText: 'Видалити' }));
         if (!ok) return;
