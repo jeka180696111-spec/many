@@ -136,10 +136,17 @@
 .dash-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-auto-rows: 4px;
+  column-gap: 16px;
+  row-gap: 0;
   align-items: start;
 }
-.dash-grid > .dash-card { min-width: 0; }
+.dash-grid > .dash-card {
+  min-width: 0;
+  /* JS виставить grid-row: span N залежно від висоти, щоб не було порожніх вікон */
+  grid-row: span 100;
+  align-self: start;
+}
 .dash-drag-handle {
   cursor: grab;
   color: var(--c-text-3);
@@ -163,7 +170,12 @@
   cursor: grabbing;
 }
 @media (max-width: 768px) {
-  .dash-grid { grid-template-columns: 1fr; }
+  .dash-grid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    row-gap: 16px;
+  }
+  .dash-grid > .dash-card { grid-row: auto; }
   .dash-card-amount { font-size: 15px; }
 }
 

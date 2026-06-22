@@ -394,15 +394,55 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   return sortedIds.map(id => widgets[id] || '').join('');
 }
 
+// ── Masonry-розкладка: без пустот між карточками різної висоти ──
+const MASONRY_ROW_PX = 4;
+const MASONRY_GAP_PX = 16;
+
+function layoutMasonry(grid) {
+  if (!grid) return;
+  // На мобільному 1 колонка — masonry не потрібен (CSS вже скидає grid-row).
+  const cols = getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length;
+  const cards = [...grid.querySelectorAll('[data-widget]')];
+  if (cols < 2) {
+    cards.forEach(c => { c.style.gridRow = ''; });
+    return;
+  }
+  cards.forEach(card => {
+    const h = card.getBoundingClientRect().height;
+    if (!h) return;
+    const span = Math.ceil((h + MASONRY_GAP_PX) / MASONRY_ROW_PX);
+    card.style.gridRow = `span ${span}`;
+  });
+}
+
+let masonryRaf = 0;
+export function scheduleMasonry(grid) {
+  if (masonryRaf) cancelAnimationFrame(masonryRaf);
+  masonryRaf = requestAnimationFrame(() => {
+    masonryRaf = 0;
+    layoutMasonry(grid);
+  });
+}
+
 // ── Drag-and-drop сортування ───────────────────────────────
 export function initDashSortable(el) {
   const grid = el.querySelector('#dash-sortable-grid');
   if (!grid) return;
 
+  // Перший прохід (одразу і ще раз після завантаження картинок/шрифтів)
+  scheduleMasonry(grid);
+  setTimeout(() => scheduleMasonry(grid), 50);
+  setTimeout(() => scheduleMasonry(grid), 300);
+
+  // Перерахунок при ресайзі вікна
+  const ro = new ResizeObserver(() => scheduleMasonry(grid));
+  ro.observe(grid);
+  [...grid.querySelectorAll('[data-widget]')].forEach(c => ro.observe(c));
+
   let dragSrc = null;
 
   function cards() { return [...grid.querySelectorAll('[data-widget]')]; }
-  function saveOrder() { setDashCardOrder(cards().map(c => c.dataset.widget)); }
+  function saveOrder() { setDashCardOrder(cards().map(c => c.dataset.widget)); scheduleMasonry(grid); }
   function getCard(target) { return target?.closest('[data-widget]'); }
   function swap(src, tgt) {
     if (!src || !tgt || src === tgt) return;
@@ -410,6 +450,7 @@ export function initDashSortable(el) {
     const si = all.indexOf(src), ti = all.indexOf(tgt);
     if (si < ti) grid.insertBefore(src, tgt.nextSibling);
     else grid.insertBefore(src, tgt);
+    scheduleMasonry(grid);
   }
 
   // Desktop HTML5 drag
