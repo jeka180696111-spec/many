@@ -370,33 +370,39 @@ export function openOperationDialog(opts = {}) {
       const btn = wrap.querySelector('#' + saveId);
       btn.disabled = true; btn.textContent = 'Збереження...';
 
+      // Будуємо body ОДИН раз — і clientId генеруємо ОДИН раз.
+      // Якщо apiPost впаде з мережевою помилкою, в catch ми перевикористаємо
+      // той самий body (і той самий clientId) — сервер на replay побачить
+      // дублікат і не створить другий запис.
+      let body;
+      if (curType === 'Переказ') {
+        if (!curCard)   { showToast('Вибери гаманець відправника', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
+        if (!curToCard) { showToast('Вибери гаманець отримувача', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
+        body = {
+          action: 'addTransfer',
+          fromWho: curMember, fromCard: curCard,
+          toWho: curToMember, toCard: curToCard,
+          amount: amt, currency: cur,
+          ...(amountUah !== undefined ? { amountUah } : {}),
+          desc,
+        };
+      } else {
+        if (!curCat)  { showToast('Вибери категорію', 'error'); btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
+        if (!curCard) { showToast('Вибери гаманець', 'error');  btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
+        body = {
+          action: isEdit ? 'updateOperation' : 'addOperation',
+          type: curType, amount: amt, currency: cur,
+          ...(amountUah !== undefined ? { amountUah } : {}),
+          category: curCat, desc,
+          date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
+          who: curMember, card: curCard,
+          ...(isEdit ? {} : { clientId: (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2))) }),
+        };
+        if (isEdit) body.row = editing.row || editing.id;
+      }
+
       try {
-        if (curType === 'Переказ') {
-          if (!curCard)   { showToast('Вибери гаманець відправника', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
-          if (!curToCard) { showToast('Вибери гаманець отримувача', 'error'); btn.disabled=false; btn.textContent='Додати'; return; }
-          await apiPost({
-            action: 'addTransfer',
-            fromWho: curMember, fromCard: curCard,
-            toWho: curToMember, toCard: curToCard,
-            amount: amt, currency: cur,
-            ...(amountUah !== undefined ? { amountUah } : {}),
-            desc,
-          });
-        } else {
-          if (!curCat)  { showToast('Вибери категорію', 'error'); btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
-          if (!curCard) { showToast('Вибери гаманець', 'error');  btn.disabled=false; btn.textContent=isEdit?'Зберегти':'Додати'; return; }
-          const body = {
-            action: isEdit ? 'updateOperation' : 'addOperation',
-            type: curType, amount: amt, currency: cur,
-            ...(amountUah !== undefined ? { amountUah } : {}),
-            category: curCat, desc,
-            date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
-            who: curMember, card: curCard,
-            ...(isEdit ? {} : { clientId: (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2))) }),
-          };
-          if (isEdit) body.row = editing.row || editing.id;
-          await apiPost(body);
-        }
+        await apiPost(body);
 
         closeModal(modalId);
         showToast(isEdit ? '✅ Збережено' : '✅ Операція додана');
@@ -410,41 +416,9 @@ export function openOperationDialog(opts = {}) {
 
         if (isNetworkError) {
           try {
-            let opBody;
-            if (curType === 'Переказ') {
-              const amt  = parseFloat(wrap.querySelector('#' + amtId)?.value || 0);
-              const desc = wrap.querySelector('#' + descId)?.value?.trim() || '';
-              const dt   = wrap.querySelector('#' + dateId)?.value;
-              const cur  = curCur;
-              const rate = parseFloat(wrap.querySelector('#' + rateId)?.value || 0);
-              const amountUah = cur !== 'UAH' && rate > 0 ? Math.round(amt * rate) : undefined;
-              opBody = {
-                action: 'addTransfer',
-                fromWho: curMember, fromCard: curCard,
-                toWho: curToMember, toCard: curToCard,
-                amount: amt, currency: cur,
-                ...(amountUah !== undefined ? { amountUah } : {}),
-                desc,
-              };
-            } else {
-              const amt  = parseFloat(wrap.querySelector('#' + amtId)?.value || 0);
-              const desc = wrap.querySelector('#' + descId)?.value?.trim() || '';
-              const dt   = wrap.querySelector('#' + dateId)?.value;
-              const cur  = curCur;
-              const rate = parseFloat(wrap.querySelector('#' + rateId)?.value || 0);
-              const amountUah = cur !== 'UAH' && rate > 0 ? Math.round(amt * rate) : undefined;
-              opBody = {
-                action: isEdit ? 'updateOperation' : 'addOperation',
-                type: curType, amount: amt, currency: cur,
-                ...(amountUah !== undefined ? { amountUah } : {}),
-                category: curCat, desc,
-                date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
-                who: curMember, card: curCard,
-                ...(isEdit ? {} : { clientId: (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2))) }),
-              };
-              if (isEdit) opBody.row = editing.row || editing.id;
-            }
-            await queueOperation(opBody);
+            // Перевикористовуємо body з ТИМ САМИМ clientId — щоб сервер
+            // міг розпізнати дубль якщо перший запит таки записався.
+            await queueOperation(body);
             // Register background sync if supported
             if ('serviceWorker' in navigator && 'SyncManager' in window) {
               const reg = await navigator.serviceWorker.ready;
@@ -458,6 +432,7 @@ export function openOperationDialog(opts = {}) {
         } else {
           showToast('Помилка: ' + e.message, 'error');
         }
+      } finally {
         btn.disabled = false;
         btn.textContent = isEdit ? 'Зберегти' : 'Додати';
       }
