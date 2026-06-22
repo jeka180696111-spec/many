@@ -361,6 +361,9 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   const limitsHtml = w.limits ? renderCategoriesBlock(d, byCategoryView, totalExpense) : '';
   if (limitsHtml) widgets.limits = limitsHtml.replace(/^<div /, '<div data-widget="limits" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
 
+  const budgetHtml = w.budget !== false ? renderBudgetCard(byCategoryView) : '';
+  if (budgetHtml) widgets.budget = budgetHtml.replace(/^<div /, '<div data-widget="budget" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+
   if (w.wallets) {
     widgets.wallets = `
       <div class="dash-card dash-wallets-card" data-widget="wallets" draggable="true">
@@ -386,7 +389,7 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   if (recentHtml) widgets.recent = recentHtml.replace(/^<div /, '<div data-widget="recent" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
 
   const order = getDashCardOrder();
-  const allIds = ['expenses','income','donut','fx','forecast','limits','wallets','credit','recurring','recent'];
+  const allIds = ['expenses','income','donut','fx','forecast','budget','limits','wallets','credit','recurring','recent'];
   const sortedIds = [...order, ...allIds.filter(id => !order.includes(id))];
   return sortedIds.map(id => widgets[id] || '').join('');
 }
@@ -706,6 +709,60 @@ function renderForecastCard(totalExpense, totalIncome) {
         </div>
       </div>
       ${overBudget ? `<div style="font-size:12px;color:var(--c-red);margin-top:6px">⚠️ При такому темпі витрати перевищать доходи на ${fmtMoney(projected - totalIncome, 'UAH')}</div>` : `<div style="font-size:12px;color:var(--c-text-3);margin-top:6px">Залишилось ${daysLeft} днів · в середньому ${fmtMoney(Math.round(dailyRate), 'UAH')}/день</div>`}
+    </div>
+  `;
+}
+
+// ── Картка "Ліміти місяця" ─────────────────────────────────
+function renderBudgetCard(byCat) {
+  const limits = getCategoryLimits();
+  const entries = Object.entries(limits)
+    .filter(([, lim]) => lim > 0)
+    .sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return '';
+
+  byCat = byCat || {};
+  const totalLimit = entries.reduce((s, [, lim]) => s + lim, 0);
+  const totalSpent = entries.reduce((s, [cat]) => s + (byCat[cat] || 0), 0);
+  const totalLeft = totalLimit - totalSpent;
+  const totalPct = Math.min(100, Math.round((totalSpent / totalLimit) * 100));
+  const totalClass = totalSpent > totalLimit ? 'over' : totalPct >= 70 ? 'warn' : 'ok';
+
+  const rows = entries.map(([cat, lim]) => {
+    const spent = byCat[cat] || 0;
+    const left = lim - spent;
+    const pct = Math.min(100, Math.round((spent / lim) * 100));
+    const cls = spent > lim ? 'over' : pct >= 70 ? 'warn' : 'ok';
+    const leftLabel = left >= 0
+      ? `залишилось ${fmtMoneyShort(left)}`
+      : `перевищено на ${fmtMoneyShort(-left)}`;
+    return `
+      <div class="budget-row">
+        <div class="budget-row-head">
+          <span class="budget-cat">${esc(cat)}${spent > lim ? ' ⚠️' : ''}</span>
+          <span class="budget-amt">${fmtMoneyShort(spent)} / ${fmtMoneyShort(lim)}</span>
+        </div>
+        <div class="budget-bar"><div class="budget-bar-fill ${cls}" style="width:${pct}%"></div></div>
+        <div class="budget-left ${cls}">${leftLabel}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="dash-card dash-budget-card">
+      <div class="dash-card-head">
+        <span class="dash-card-title">Ліміти місяця</span>
+        <a href="#" class="dash-card-action" data-go="settings">Налаштувати →</a>
+      </div>
+      <div class="budget-total">
+        <div class="budget-total-row">
+          <span class="budget-total-label">Всього потрачено</span>
+          <span class="budget-total-amt ${totalClass}">${fmtMoney(totalSpent, 'UAH')} / ${fmtMoney(totalLimit, 'UAH')}</span>
+        </div>
+        <div class="budget-bar budget-bar-big"><div class="budget-bar-fill ${totalClass}" style="width:${totalPct}%"></div></div>
+        <div class="budget-left ${totalClass}">${totalLeft >= 0 ? `залишилось ${fmtMoney(totalLeft, 'UAH')}` : `перевищено на ${fmtMoney(-totalLeft, 'UAH')}`}</div>
+      </div>
+      <div class="budget-list">${rows}</div>
     </div>
   `;
 }

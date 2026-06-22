@@ -804,6 +804,7 @@ function renderSubPageBody(key) {
         { key: 'chart',     label: 'Графіки витрат/доходів' },
         { key: 'donut',     label: 'Кругова діаграма категорій' },
         { key: 'limits',    label: 'Топ категорій з лімітами' },
+        { key: 'budget',    label: 'Ліміти місяця (прогрес)' },
         { key: 'credit',    label: 'Кредитні картки' },
         { key: 'recurring', label: 'Найближчі платежі' },
         { key: 'recent',    label: 'Останні операції' },

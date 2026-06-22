@@ -1226,3 +1226,72 @@
   accent-color: var(--c-accent);
   cursor: pointer;
 }
+
+/* ── Картка "Ліміти місяця" ─────────────────────────────── */
+.dash-budget-card .budget-total {
+  padding: 12px 14px;
+  background: var(--c-surface-2);
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+.dash-budget-card .budget-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.dash-budget-card .budget-total-label {
+  font-size: 13px;
+  color: var(--c-text-3);
+}
+.dash-budget-card .budget-total-amt {
+  font-size: 15px;
+  font-weight: 700;
+}
+.dash-budget-card .budget-total-amt.ok    { color: var(--c-text-1); }
+.dash-budget-card .budget-total-amt.warn  { color: #d97706; }
+.dash-budget-card .budget-total-amt.over  { color: var(--c-red); }
+.dash-budget-card .budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dash-budget-card .budget-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+.dash-budget-card .budget-cat {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text-1);
+}
+.dash-budget-card .budget-amt {
+  font-size: 13px;
+  color: var(--c-text-2);
+  font-variant-numeric: tabular-nums;
+}
+.dash-budget-card .budget-bar {
+  height: 6px;
+  background: var(--c-surface-3, rgba(127,127,127,0.15));
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+.dash-budget-card .budget-bar-big { height: 10px; }
+.dash-budget-card .budget-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width .35s ease;
+}
+.dash-budget-card .budget-bar-fill.ok    { background: var(--c-green, #16a34a); }
+.dash-budget-card .budget-bar-fill.warn  { background: #f59e0b; }
+.dash-budget-card .budget-bar-fill.over  { background: var(--c-red, #dc2626); }
+.dash-budget-card .budget-left {
+  font-size: 12px;
+  margin-top: 4px;
+}
+.dash-budget-card .budget-left.ok    { color: var(--c-text-3); }
+.dash-budget-card .budget-left.warn  { color: #d97706; }
+.dash-budget-card .budget-left.over  { color: var(--c-red); font-weight: 600; }

@@ -182,7 +182,7 @@ export function setPalette(p) {
 // ── Налаштування блоків дашборду ─────────────────────────────
 const DEFAULT_WIDGETS = {
   balance: true, wallets: true, chart: true, donut: true,
-  limits: true, credit: true, recurring: true, recent: true,
+  limits: true, budget: true, credit: true, recurring: true, recent: true,
 };
 export function getDashWidgets() {
   try {
@@ -194,7 +194,7 @@ export function setDashWidgets(w) {
   localStorage.setItem('budget_dash_widgets', JSON.stringify(w));
 }
 
-const DEFAULT_CARD_ORDER = ['expenses','income','donut','fx','forecast','limits','wallets','credit','recurring','recent'];
+const DEFAULT_CARD_ORDER = ['expenses','income','donut','fx','forecast','budget','limits','wallets','credit','recurring','recent'];
 export function getDashCardOrder() {
   try {
     const s = localStorage.getItem('budget_dash_card_order');
