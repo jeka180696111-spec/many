@@ -349,20 +349,31 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
       </div>`;
   }
 
+  // Допоміжна функція: додати data-widget/draggable на корінь і ручку в head.
+  // Регулярка по dash-card-head ловить і варіанти з додатковими класами
+  // (наприклад "dash-card-head credit-block-head").
+  const HEAD_RE = /<div class="dash-card-head([^"]*)">/;
+  function wrap(html, id) {
+    if (!html) return '';
+    return html
+      .replace(/^<div /, `<div data-widget="${id}" draggable="true" `)
+      .replace(HEAD_RE, (m, extra) => `<div class="dash-card-head${extra}">${DRAG_HANDLE}`);
+  }
+
   const donutHtml = w.donut ? renderDonutCard(byCategoryView, totalExpense, periodLabel) : '';
-  if (donutHtml) widgets.donut = donutHtml.replace(/^<div /, '<div data-widget="donut" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (donutHtml) widgets.donut = wrap(donutHtml, 'donut');
 
   const fxHtml = renderFxCard();
-  if (fxHtml) widgets.fx = fxHtml.replace(/^<div /, '<div data-widget="fx" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (fxHtml) widgets.fx = wrap(fxHtml, 'fx');
 
   const forecastHtml = renderForecastCard(totalExpense, totalIncome);
-  if (forecastHtml) widgets.forecast = forecastHtml.replace(/^<div /, '<div data-widget="forecast" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (forecastHtml) widgets.forecast = wrap(forecastHtml, 'forecast');
 
   const limitsHtml = w.limits ? renderCategoriesBlock(d, byCategoryView, totalExpense) : '';
-  if (limitsHtml) widgets.limits = limitsHtml.replace(/^<div /, '<div data-widget="limits" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (limitsHtml) widgets.limits = wrap(limitsHtml, 'limits');
 
   const budgetHtml = w.budget !== false ? renderBudgetCard(byCategoryView) : '';
-  if (budgetHtml) widgets.budget = budgetHtml.replace(/^<div /, '<div data-widget="budget" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (budgetHtml) widgets.budget = wrap(budgetHtml, 'budget');
 
   if (w.wallets) {
     widgets.wallets = `
@@ -380,13 +391,13 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   }
 
   const creditHtml = w.credit ? renderCreditCardsBlock(viewAs) : '';
-  if (creditHtml) widgets.credit = creditHtml.replace(/^<div /, '<div data-widget="credit" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (creditHtml) widgets.credit = wrap(creditHtml, 'credit');
 
   const recurringHtml = w.recurring ? renderUpcomingPaymentsBlock(viewAs) : '';
-  if (recurringHtml) widgets.recurring = recurringHtml.replace(/^<div /, '<div data-widget="recurring" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (recurringHtml) widgets.recurring = wrap(recurringHtml, 'recurring');
 
   const recentHtml = w.recent ? renderRecentBlock(d.recent || [], viewAs) : '';
-  if (recentHtml) widgets.recent = recentHtml.replace(/^<div /, '<div data-widget="recent" draggable="true" ').replace(/<div class="dash-card-head">/, `<div class="dash-card-head">${DRAG_HANDLE}`);
+  if (recentHtml) widgets.recent = wrap(recentHtml, 'recent');
 
   const order = getDashCardOrder();
   const allIds = ['expenses','income','donut','fx','forecast','budget','limits','wallets','credit','recurring','recent'];

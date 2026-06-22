@@ -63,7 +63,7 @@ export function renderCreditCardsBlock(viewAs) {
 
   return `
     <div class="dash-card credit-block">
-      <div class="credit-block-head">
+      <div class="dash-card-head credit-block-head">
         <span class="dash-card-title"><i class="ti ti-credit-card-pay"></i> Кредитні картки</span>
         <span class="credit-head-total">
           <span class="c-red">${fmtMoney(totalUsed, 'UAH')}</span>
