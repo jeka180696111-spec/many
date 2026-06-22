@@ -112,6 +112,7 @@ function loadPageData(page) {
 
 // ── Повний синк (з Firestore) ───────────────────────────────
 async function fullSync() {
+  if (!state.familyId) { log('full sync skipped: familyId not set'); return; }
   try {
     // 1. Курси валют (потрібні для конвертації)
     await refreshFx();
@@ -536,6 +537,7 @@ async function bootApp() {
   setInterval(() => {
     if (document.hidden) return;
     if (state.currentPage !== 'dashboard') return;
+    if (!state.familyId) return;
     log('auto-sync tick');
     loadDashboard();
   }, 120000);

@@ -28,6 +28,7 @@ export function initFirestore() {
 
 // ── Хелпер: колекція родини ──────────────────────────────────
 function familyRef() {
+  if (!state.familyId) throw new Error('familyId not set');
   return db.collection('families').doc(state.familyId);
 }
 
@@ -547,7 +548,7 @@ async function deleteGoal(body) {
 let syncInFlight = null;
 export async function syncSettingsToSheet() {
   if (syncInFlight) return syncInFlight;
-  if (!db) {
+  if (!db || !state.familyId) {
     syncState.pendingSettings = true;
     return;
   }
