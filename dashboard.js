@@ -597,7 +597,12 @@ function renderWalletsBlock(viewAs) {
 
   return `
     <div class="dash-wallets-list">
-      ${cardsWithBal.map(c => `
+      ${cardsWithBal.map(c => {
+        // Для кредитки показуємо власний баланс зверху, а ліміт — окремим рядком.
+        // Якщо балансу немає (0) — показуємо ліміт як "вільно" зверху.
+        const hasOwnMoney = c.credit && c.balance > 0;
+        const usedCredit = c.credit && c.balance < 0;
+        return `
         <div class="dash-wallet-item" data-owner="${esc(c.owner)}" data-card="${esc(c.id)}">
           <div class="dash-wallet-icon" style="background:${c.bg}">
             <i class="ti ${c.icon}" style="color:${c.color}"></i>
@@ -610,20 +615,22 @@ function renderWalletsBlock(viewAs) {
                 <div class="wallet-credit-track">
                   <div class="wallet-credit-fill ${c.credit.status}" style="width:${c.credit.pct}%"></div>
                 </div>
-                <span class="wallet-credit-label ${c.credit.creditUsed > 0 ? 'used' : ''}">
-                  використано ${fmtMoney(c.credit.creditUsed)} з ${fmtMoney(c.credit.limit)}
+                <span class="wallet-credit-label ${usedCredit ? 'used' : ''}">
+                  ${usedCredit
+                    ? `використано ${fmtMoney(c.credit.creditUsed)} з ${fmtMoney(c.credit.limit)}`
+                    : `ліміт ${fmtMoney(c.credit.limit)} · вільно ${fmtMoney(c.credit.creditAvail)}`}
                 </span>
               </div>
             ` : ''}
           </div>
-          <div class="dash-wallet-balance ${c.credit ? 'pos' : (c.balance >= 0 ? 'pos' : 'neg')}">
-            ${c.credit
+          <div class="dash-wallet-balance ${c.balance >= 0 ? 'pos' : 'neg'}">
+            ${c.credit && !hasOwnMoney && !usedCredit
               ? `${fmtMoney(c.credit.creditAvail)} <span style="font-size:11px;font-weight:500;opacity:.7">вільно</span>`
               : fmtMoneyWithUah(c.balance, c.currency || 'UAH', state.fx)
             }
           </div>
         </div>
-      `).join('')}
+      `;}).join('')}
     </div>
   `;
 }
