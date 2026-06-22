@@ -350,13 +350,16 @@ function buildDashGrid(w, periodLabel, totalExpense, totalIncome, byCategoryView
   }
 
   // Допоміжна функція: додати data-widget/draggable на корінь і ручку в head.
-  // Регулярка по dash-card-head ловить і варіанти з додатковими класами
-  // (наприклад "dash-card-head credit-block-head").
+  // Регулярки:
+  //  - ROOT_RE ловить перший <div ... незалежно від leading whitespace
+  //    (шаблонні літерали в renderXxxCard починаються з \n + відступ).
+  //  - HEAD_RE ловить dash-card-head з будь-якими додатковими класами.
+  const ROOT_RE = /<div\b/;
   const HEAD_RE = /<div class="dash-card-head([^"]*)">/;
   function wrap(html, id) {
     if (!html) return '';
     return html
-      .replace(/^<div /, `<div data-widget="${id}" draggable="true" `)
+      .replace(ROOT_RE, `<div data-widget="${id}" draggable="true"`)
       .replace(HEAD_RE, (m, extra) => `<div class="dash-card-head${extra}">${DRAG_HANDLE}`);
   }
 
