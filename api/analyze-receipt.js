@@ -1,4 +1,19 @@
-// /api/analyze-receipt.js — Receipt analysis via Claude vision API
+// /api/analyze-receipt.js — Receipt analysis via Claude vision → Gemini vision фолбек
+
+import { callLLMVision, getLLMKeys } from './_llm.js';
+
+const SYSTEM = `Ти — точний OCR-аналізатор чеків для українського застосунку обліку витрат.
+Завдання: витягнути дані з фото чека/квитанції та повернути ТІЛЬКИ валідний JSON.
+Правила:
+- amount: загальна сума до сплати (число, без валюти)
+- store: назва магазину/закладу (коротко)
+- date: дата у форматі YYYY-MM-DD (або null якщо не видно)
+- category: ОДНА категорія з переліку: Продукти, Ресторани, Транспорт, Комунальні, Здоров'я, Одяг, Розваги, Дім, Дитячі, Інше
+- items: масив позицій [{name, amount}] (до 5 позицій, лише якщо чітко видно)
+Якщо не вдається розпізнати — {"error": "не вдалося розпізнати"}
+Повертай ТІЛЬКИ JSON, без пояснень, без markdown.`;
+
+const PROMPT = 'Проаналізуй цей чек і поверни JSON з полями: amount, store, date, category, items.';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,59 +26,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing image or mediaType' });
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 512,
-        system: `Ти — точний OCR-аналізатор чеків для українського застосунку обліку витрат.
-Завдання: витягнути дані з фото чека/квитанції та повернути ТІЛЬКИ валідний JSON.
-Правила:
-- amount: загальна сума до сплати (число, без валюти)
-- store: назва магазину/закладу (коротко)
-- date: дата у форматі YYYY-MM-DD (або null якщо не видно)
-- category: ОДНА категорія з переліку: Продукти, Ресторани, Транспорт, Комунальні, Здоров'я, Одяг, Розваги, Дім, Дитячі, Інше
-- items: масив позицій [{name, amount}] (до 5 позицій, лише якщо чітко видно)
-Якщо не вдається розпізнати — {"error": "не вдалося розпізнати"}
-Повертай ТІЛЬКИ JSON, без пояснень, без markdown.`,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image',
-                source: { type: 'base64', media_type: mediaType, data: image },
-              },
-              {
-                type: 'text',
-                text: 'Проаналізуй цей чек і поверни JSON з полями: amount, store, date, category, items.',
-              },
-            ],
-          },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.text();
-      console.error('Claude API error:', err);
-      return res.status(200).json({ error: 'Claude API error' });
+    const { gemini, anthropic } = getLLMKeys();
+    if (gemini.length === 0 && !anthropic) {
+      return res.status(200).json({ error: 'No LLM keys configured' });
     }
 
-    const data = await response.json();
-    const text = (data.content?.[0]?.text || '').trim();
-
-    // Try direct parse first
+    let text;
     try {
-      return res.status(200).json(JSON.parse(text));
+      text = await callLLMVision(SYSTEM, PROMPT, image, mediaType, { maxTokens: 512 });
+    } catch (e) {
+      console.error('[analyze-receipt]', e.message);
+      return res.status(200).json({ error: e.message });
+    }
+
+    // Gemini іноді обгортає JSON у ```json ... ```
+    const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+    try {
+      return res.status(200).json(JSON.parse(cleaned));
     } catch (_) {
-      // Extract JSON from potential markdown wrapper
-      const match = text.match(/\{[\s\S]*\}/);
+      const match = cleaned.match(/\{[\s\S]*\}/);
       if (match) {
         try { return res.status(200).json(JSON.parse(match[0])); } catch (_) {}
       }

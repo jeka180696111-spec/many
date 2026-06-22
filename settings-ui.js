@@ -458,7 +458,7 @@ function renderMainMenu() {
         </button>
       </div>
 
-      <div class="settings-footer">Money Budget · v3.0</div>
+      <div class="settings-footer">Money Budget · v3.1</div>
     </div>
   `;
 }

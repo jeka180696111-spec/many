@@ -1,4 +1,6 @@
-// /api/ai-report.js — проксі для Claude AI звітів
+// /api/ai-report.js — AI звіти (Claude → Gemini фолбек)
+
+import { callLLM, getLLMKeys } from './_llm.js';
 
 const SYSTEM = `Ти — саркастичний фінансовий радник на ім'я Фінн. Стиль: дотепний, їдкий, але з любов'ю.
 Правила:
@@ -17,34 +19,19 @@ export default async function handler(req, res) {
   const { prompt } = req.body || {};
   if (!prompt) return res.status(400).json({ error: 'No prompt' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  const { gemini, anthropic } = getLLMKeys();
+  if (gemini.length === 0 && !anthropic) {
+    return res.status(500).json({ error: 'No LLM keys configured (ANTHROPIC_API_KEY or GEMINI_API_KEY_1/2)' });
+  }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const text = await callLLM(SYSTEM, [{ role: 'user', content: prompt }], {
+      maxTokens: 1000,
+      model: 'claude-sonnet-4-6',
     });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: err.error?.message || `API ${response.status}` });
-    }
-
-    const data = await response.json();
-    const text = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || '';
     return res.json({ text });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    console.error('[ai-report]', e.message);
+    return res.status(502).json({ error: e.message });
   }
 }

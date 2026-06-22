@@ -1,4 +1,6 @@
-// /api/ai-chat.js — чат з AI фінансовим радником
+// /api/ai-chat.js — чат з AI фінансовим радником (Claude → Gemini фолбек)
+
+import { callLLM, getLLMKeys } from './_llm.js';
 
 const SYSTEM = `Ти — саркастичний особистий фінансовий радник на ім'я Фінн.
 Стиль: дотепний, їдкий, але з теплотою і турботою. Як старший друг який розбирається в фінансах.
@@ -14,38 +16,25 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { messages = [], context = '' } = req.body || {};
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+  const { gemini, anthropic } = getLLMKeys();
+  if (gemini.length === 0 && !anthropic) {
+    return res.status(500).json({ error: 'No LLM keys configured (ANTHROPIC_API_KEY or GEMINI_API_KEY_1/2)' });
+  }
 
   const systemWithContext = context
     ? `${SYSTEM}\n\nПоточні фінансові дані користувача:\n${context}`
     : SYSTEM;
 
+  // Очищуємо невалідні записи в історії (Anthropic відкидає пусті content).
+  const cleanMessages = (messages || [])
+    .filter(m => m && m.role && typeof m.content === 'string' && m.content.trim().length > 0)
+    .slice(-10);
+
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 600,
-        system: systemWithContext,
-        messages: messages.slice(-10),
-      }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      return res.status(response.status).json({ error: err.error?.message || `API ${response.status}` });
-    }
-
-    const data = await response.json();
-    const text = data.content?.filter(c => c.type === 'text').map(c => c.text).join('\n') || '';
+    const text = await callLLM(systemWithContext, cleanMessages, { maxTokens: 600 });
     return res.json({ text });
   } catch (e) {
-    return res.status(500).json({ error: e.message });
+    console.error('[ai-chat]', e.message);
+    return res.status(502).json({ error: e.message });
   }
 }
