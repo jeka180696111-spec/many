@@ -392,6 +392,7 @@ export function openOperationDialog(opts = {}) {
             category: curCat, desc,
             date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
             who: curMember, card: curCard,
+            ...(isEdit ? {} : { clientId: (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2))) }),
           };
           if (isEdit) body.row = editing.row || editing.id;
           await apiPost(body);
@@ -439,6 +440,7 @@ export function openOperationDialog(opts = {}) {
                 category: curCat, desc,
                 date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
                 who: curMember, card: curCard,
+                ...(isEdit ? {} : { clientId: (crypto.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2))) }),
               };
               if (isEdit) opBody.row = editing.row || editing.id;
             }

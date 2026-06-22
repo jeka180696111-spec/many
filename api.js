@@ -349,6 +349,18 @@ async function addOperation(body) {
     amountUah = Number(body.amountUah);
   }
 
+  // Ідемпотентність: якщо клієнт передав clientId і операція з ним
+  // уже є — не створюємо дубль (захист від offline-replay).
+  if (body.clientId) {
+    const existing = await familyRef().collection('operations')
+      .where('clientId', '==', body.clientId).limit(1).get();
+    if (!existing.empty) {
+      const doc = existing.docs[0];
+      log('operation idempotent hit:', body.clientId, '→', doc.id);
+      return { ok: true, id: doc.id, duplicate: true };
+    }
+  }
+
   const op = {
     date: body.date || todayKyiv(),
     type: body.type,
@@ -360,6 +372,7 @@ async function addOperation(body) {
     who: body.who || state.member || FAMILY_MEMBERS[0],
     card: body.card || '',
     createdAt: new Date().toISOString(),
+    ...(body.clientId ? { clientId: body.clientId } : {}),
   };
 
   const ref = await familyRef().collection('operations').add(op);

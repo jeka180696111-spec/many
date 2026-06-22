@@ -9,11 +9,25 @@ import { openOperationDialog } from './operations.js';
 import { getProfiles, getViewAsMember, getExpCats, getIncCats } from './storage.js';
 import { addLongPress, addSwipeDelete } from './gestures.js';
 
+// Дедуп по id/row — захист від подвійних записів через offline-replay
+// або пагінацію, що повертає ті ж операції.
+function dedupeOps(arr) {
+  const seen = new Set();
+  const out = [];
+  for (const o of arr || []) {
+    const key = String(o.id || o.row || `${o.date}|${o.type}|${o.amount}|${o.card}|${o.desc}|${o.createdAt}`);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(o);
+  }
+  return out;
+}
+
 export async function loadOperations() {
   try {
     const cur = state.currentMonth instanceof Date ? state.currentMonth : new Date();
     const data = await apiGet('operations', { month: monthKey(cur), limit: 50 });
-    state.operations = data.operations || [];
+    state.operations = dedupeOps(data.operations || []);
     state.opsAllLoaded = (data.operations || []).length < 50;
   } catch (e) {
     state.operations = [];
@@ -371,7 +385,7 @@ function refreshOpsContent() {
       const monthKey2 = (() => { const d = state.currentMonth instanceof Date ? state.currentMonth : new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); })();
       const more = await import('./api.js').then(m => m.apiGet('operations', { month: monthKey2, limit: 50, offset: state.operations.length }));
       if (more.operations?.length) {
-        state.operations = [...state.operations, ...more.operations];
+        state.operations = dedupeOps([...state.operations, ...more.operations]);
         if (more.operations.length < 50) state.opsAllLoaded = true;
       } else { state.opsAllLoaded = true; }
       refreshOpsContent();
@@ -540,7 +554,7 @@ function bindHandlers(el) {
       const cur = state.currentMonth instanceof Date ? state.currentMonth : new Date();
       const data = await apiGet('operations', { month: monthKey(cur), limit: 50, offset: state.operations.length });
       const newOps = data.operations || [];
-      state.operations = [...state.operations, ...newOps];
+      state.operations = dedupeOps([...state.operations, ...newOps]);
       if (newOps.length === 0) state.opsAllLoaded = true;
       else if (newOps.length < 50) state.opsAllLoaded = true;
     } catch (e) {
