@@ -559,12 +559,28 @@ async function deleteGoal(body) {
 // ═══════════════════════════════════════════════════════════════
 
 let syncInFlight = null;
-export async function syncSettingsToSheet() {
-  if (syncInFlight) return syncInFlight;
+let syncDebounceTimer = null;
+
+// Зливаємо кілька викликів в один реальний запит. Якщо кілька UI-подій
+// (collapse, drag, тогл) сталися підряд — летить ОДИН запит зі свіжими
+// значеннями зі storage, замість N послідовних запитів.
+export function syncSettingsToSheet() {
   if (!db || !state.familyId) {
     syncState.pendingSettings = true;
-    return;
+    return Promise.resolve();
   }
+  if (syncInFlight) return syncInFlight;
+  return new Promise(resolve => {
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(() => {
+      syncDebounceTimer = null;
+      _doSyncSettings().then(resolve).catch(resolve);
+    }, 250);
+  });
+}
+
+async function _doSyncSettings() {
+  if (syncInFlight) return syncInFlight;
 
   syncInFlight = (async () => {
     try {
