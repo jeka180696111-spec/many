@@ -48,7 +48,8 @@ export function renderOperationsPage() {
   const ops = getFilteredOps();
   const f = state.opFilter || { who: 'all', type: 'all', cat: 'all', card: 'all' };
   const viewAs = getViewAsMember();
-  const effectiveWho = f.who !== 'all' ? f.who : (viewAs || 'all');
+  // Глобальний viewAs (топбар) має пріоритет над локальним фільтром 'хто'.
+  const effectiveWho = viewAs || (f.who !== 'all' ? f.who : 'all');
   const searchQ = (state.opSearch || '').trim().toLowerCase();
 
   const cur = state.currentMonth instanceof Date ? state.currentMonth : new Date();
@@ -319,7 +320,8 @@ function getFilteredOps() {
   });
   const f = state.opFilter || { who: 'all', type: 'all', cat: 'all', card: 'all' };
   const viewAs = getViewAsMember();
-  const effectiveWho = f.who !== 'all' ? f.who : (viewAs || 'all');
+  // Глобальний viewAs (топбар) має пріоритет над локальним фільтром 'хто'.
+  const effectiveWho = viewAs || (f.who !== 'all' ? f.who : 'all');
   if (effectiveWho !== 'all') ops = ops.filter(o => o.who === effectiveWho);
   if (f.type !== 'all') ops = ops.filter(o => o.type === f.type);
   if (f.cat && f.cat !== 'all') ops = ops.filter(o => o.category === f.cat);

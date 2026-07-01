@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { FAMILY_MEMBERS, state } from './config.js';
-import { getCards, setCards, getWalletTypes, getWalletTypeById, getProfiles } from './storage.js';
+import { getCards, setCards, getWalletTypes, getWalletTypeById, getProfiles, getViewAsMember, setViewAsMember } from './storage.js';
 import { syncSettingsToSheet } from './api.js';
 import { esc, fmtMoney, fmtMoneyWithUah, toUah, showToast } from './utils.js';
 import { openIconPicker } from './icon-picker.js';
@@ -14,8 +14,12 @@ export function renderWalletsPage() {
   const el = document.getElementById('page-wallets');
   if (!el) return;
 
-  const ownerFilter = state.walletFilter && state.walletFilter !== 'all' && FAMILY_MEMBERS.includes(state.walletFilter)
-    ? state.walletFilter : 'all';
+  // Джерело правди для фільтра власника — глобальний viewAs (топбар).
+  // Локальний state.walletFilter тепер лише дзеркалить його, щоб UI-дропдаун
+  // на цій сторінці показував ту саму людину, що і топбар.
+  const globalViewAs = getViewAsMember();
+  const ownerFilter = globalViewAs && FAMILY_MEMBERS.includes(globalViewAs) ? globalViewAs : 'all';
+  state.walletFilter = ownerFilter;
   const typeFilter = state.walletTypeFilter || 'all';
 
   // Збираємо всі картки з прапором owner
@@ -218,8 +222,15 @@ export function renderWalletsPage() {
           item.textContent = opt.label;
           item.addEventListener('click', e2 => {
             e2.stopPropagation();
-            if (key === 'owner') state.walletFilter = opt.val;
-            else state.walletTypeFilter = opt.val;
+            if (key === 'owner') {
+              // Синхронізуємо з глобальним viewAs — щоб при перемиканні тут
+              // топбар і всі інші сторінки теж підхопили нового 'спостерігача'.
+              setViewAsMember(opt.val === 'all' ? null : opt.val);
+              state.walletFilter = opt.val;
+              import('./main.js').then(m => m.renderTopbar && m.renderTopbar());
+            } else {
+              state.walletTypeFilter = opt.val;
+            }
             closeWfDropdown();
             renderWalletsPage();
           });

@@ -227,7 +227,7 @@ function renderSidebar() {
 }
 
 // ── Рендер topbar ───────────────────────────────────────────
-function renderTopbar() {
+export function renderTopbar() {
   const tb = document.getElementById('topbar');
   if (!tb) return;
 
@@ -315,6 +315,10 @@ function openViewAsMenu(anchor) {
     b.addEventListener('click', () => {
       const val = b.dataset.viewas;
       setViewAsMember(val === 'all' ? null : val);
+      // Скидаємо локальні фільтри 'хто' на сторінках, щоб глобальний
+      // перемикач був єдиним джерелом правди для власника.
+      state.walletFilter = 'all';
+      if (state.opFilter) state.opFilter.who = 'all';
       menu.remove();
       renderTopbar();
       navigateTo(state.currentPage);
