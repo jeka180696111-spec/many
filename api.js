@@ -163,13 +163,18 @@ async function getDashboard(period) {
   ]);
   const recent = recentSnap.docs.map(doc => ({ id: doc.id, row: doc.id, ...doc.data() }));
 
+  // ВАЖЛИВО: транзакції по картці зберігаємо у ВАЛЮТІ ОПЕРАЦІЇ (o.amount).
+  // Раніше сумувалось o.amountUah — тоді баланс валютного гаманця (USD, EUR)
+  // рахувався у гривнях, і при відображенні в його валюті виходило '≈ 100 USD'
+  // замість реальних 100. Для UAH-карток різниці немає.
+  // Переказ між своїми картками рахуємо (це і є суть переміщення грошей).
   const cardBalances = {};
   allCardSnap.docs.forEach(doc => {
     const o = doc.data();
-    if (o.category === 'Переказ' || !o.card) return;
+    if (!o.card) return;
     const key = `${o.who || ''}:${o.card}`;
-    if (!cardBalances[key]) cardBalances[key] = { income: 0, expense: 0 };
-    const amt = o.amountUah || o.amount || 0;
+    if (!cardBalances[key]) cardBalances[key] = { income: 0, expense: 0, currency: o.currency || 'UAH' };
+    const amt = Number(o.amount) || 0;
     if (o.type === 'Дохід') cardBalances[key].income += amt;
     if (o.type === 'Витрата') cardBalances[key].expense += amt;
   });

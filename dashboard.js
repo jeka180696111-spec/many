@@ -544,13 +544,16 @@ function renderWalletsBlock(viewAs) {
   });
 
   function cardBal(c) {
-    // Для кредитних карток — all-time баланс
-    const limit = Number(c.creditLimit) || 0;
-    if (limit > 0 && state.dashboard?.cardBalances) {
+    // Основний шлях — all-time баланс з state.dashboard.cardBalances
+    // (порахований на бекенді по всіх операціях, у валюті операції).
+    // Так само для кредитних, звичайних і накопичувальних гаманців.
+    if (state.dashboard?.cardBalances) {
       const key = `${c.owner}:${c.id}`;
       const b = state.dashboard.cardBalances[key];
-      if (b) return Math.round(b.income - b.expense);
+      if (b) return Math.round((b.income || 0) - (b.expense || 0));
     }
+    // Фолбек, якщо дашборд ще не завантажився — сумуємо state.operations
+    // (це поточний місяць, тому не точно, але щось показати краще ніж 0).
     let bal = 0;
     const cardCur = c.currency || 'UAH';
     (state.operations || []).forEach(o => {
