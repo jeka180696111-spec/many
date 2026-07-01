@@ -840,6 +840,50 @@ function formatStats(ops, label) {
   return txt;
 }
 
+// ── Визначення 'на кого' записувати ─────────────────────────
+// Якщо повідомлення починається з імені іншого члена родини (в будь-якому
+// відмінку), витягуємо це ім'я як target і повертаємо очищений текст.
+//
+// Приклади:
+//   "марина продукти 300"   → who=Марина
+//   "марині каву 85"        → who=Марина (укр. дав. відмінок)
+//   "для марини такси 200"  → who=Марина
+//   "євгена 500 на квіти"   → who=Євген (від Марини)
+//   "каву 85"               → who=<автор повідомлення>
+function detectTargetMember(text, senderWho, memberNames) {
+  if (!text || !memberNames || !memberNames.length) {
+    return { who: senderWho, cleaned: text };
+  }
+  const others = memberNames.filter(n => n && n !== senderWho);
+  // Ловимо префікс: [для|на|від|у]? + ім'я + будь-які закінчення + роздільник.
+  for (const name of others) {
+    // Стем = ім'я без 1-2 останніх букв, щоб зловити відмінкові закінчення.
+    // 'Марина' → 'марин', 'Євген' → 'євген', 'Ольга' → 'ольг'.
+    const stemLen = Math.max(3, name.length - (name.length > 4 ? 2 : 1));
+    const stem = name.toLowerCase().slice(0, stemLen);
+    const stemEsc = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^(?:для\\s+|на\\s+|від\\s+|у\\s+)?${stemEsc}[а-яіїєґёА-ЯІЇЄҐЁ]*[\\s:,\\-]+`, 'i');
+    const m = text.match(re);
+    if (m) {
+      const cleaned = text.slice(m[0].length).trim();
+      // Якщо після імені лишається < 2 символів — це просто звернення, не витрата.
+      if (cleaned.length >= 2) return { who: name, cleaned };
+    }
+  }
+  return { who: senderWho, cleaned: text };
+}
+
+async function getFamilyMemberNames(familyId) {
+  try {
+    const doc = await db.collection('families').doc(familyId).get();
+    const arr = doc.data()?.members || [];
+    return arr.map(m => m.name).filter(Boolean);
+  } catch (e) {
+    console.warn('[getFamilyMemberNames]', e.message);
+    return [];
+  }
+}
+
 // ── parseMessage ─────────────────────────────────────────────
 function parseMessage(text) {
   if (!text) return null;
@@ -1618,7 +1662,13 @@ return async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    const parsed = parseMessage(text);
+    // Автовизначення target-члена родини: якщо на початку тексту згадано
+    // ім'я іншого учасника (в будь-якому відмінку), записуємо операцію
+    // на нього. Приклад: 'марина продукти 300' від Євгена → who=Марина.
+    const memberNames = await getFamilyMemberNames(familyId);
+    const { who: targetWho, cleaned } = detectTargetMember(text, who, memberNames);
+
+    const parsed = parseMessage(cleaned);
     if (!parsed) {
       return handleAIChat(chatId, text, who, familyId, userId, res, { isHQ: isFamilyHQGroup });
     }
@@ -1628,7 +1678,7 @@ return async function handler(req, res) {
       ? Math.round(parsed.amount * (rates[parsed.currency] || 1))
       : parsed.amount;
 
-    const opData = { type: parsed.type, amount: parsed.amount, currency: parsed.currency, amountUah, category: parsed.category, card: parsed.card, desc: parsed.desc, who, familyId };
+    const opData = { type: parsed.type, amount: parsed.amount, currency: parsed.currency, amountUah, category: parsed.category, card: parsed.card, desc: parsed.desc, who: targetWho, familyId };
     const pendingId = await savePending(opData, userId);
 
     await sendMessage(chatId, pendingPreviewText(opData), {

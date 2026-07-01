@@ -1,4 +1,4 @@
-const CACHE = 'budget-v30';
+const CACHE = 'budget-v31';
 const STATIC = [
   '/', '/index.html',
   '/base.css', '/layout.css', '/components.css', '/pages.css', '/new-features.css',

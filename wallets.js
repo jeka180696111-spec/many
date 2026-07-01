@@ -36,16 +36,17 @@ export function renderWalletsPage() {
   const types = getWalletTypes();
   const profiles = getProfiles();
 
-  // Підрахунок балансу для кожної картки
-  // Для кредитних карток використовуємо all-time дані з dashboard
+  // Підрахунок балансу для кожної картки.
+  // Основний шлях — all-time дані з бекенда (state.dashboard.cardBalances),
+  // однаково для кредитних і звичайних гаманців. Це синхронізує сторінку
+  // 'Гаманці' з дашбордом. state.operations тут — тільки фолбек, якщо
+  // дашборд ще не завантажився.
   function cardBalance(card) {
-    const limit = Number(card.creditLimit) || 0;
-    if (limit > 0 && state.dashboard?.cardBalances) {
+    if (state.dashboard?.cardBalances) {
       const key = `${card.owner}:${card.id}`;
       const b = state.dashboard.cardBalances[key];
-      if (b) return Math.round(b.income - b.expense);
+      if (b) return Math.round((b.income || 0) - (b.expense || 0));
     }
-    // Звичайний кошелек — поточні операції у власній валюті
     const ops = state.operations || [];
     let bal = 0;
     ops.forEach(o => {

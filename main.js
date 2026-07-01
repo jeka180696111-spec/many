@@ -89,6 +89,11 @@ function loadPageData(page) {
     case 'dashboard':
       loadDashboard();
       break;
+    case 'wallets':
+      // Гаманці показують баланс з state.dashboard.cardBalances (all-time).
+      // Якщо дашборд ще не завантажено — тягнемо, а потім рендеримо ще раз.
+      if (!state.dashboard) loadDashboard().then(() => renderWalletsPage());
+      break;
     case 'operations':
       loadOperations();
       break;
