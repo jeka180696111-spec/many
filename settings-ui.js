@@ -1797,7 +1797,7 @@ function openMonoConnectFlow() {
         if (!discoveredAccounts) {
           validateBtn.disabled = true; validateBtn.textContent = 'Перевіряю...';
           try {
-            const r = await fetch('/api/mono-connect', {
+            const r = await fetch('/api/mono?action=connect', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ token }),
             });
@@ -1833,7 +1833,7 @@ function openMonoConnectFlow() {
 
         validateBtn.disabled = true; validateBtn.textContent = 'Зберігаю...';
         try {
-          const r = await fetch('/api/mono-save', {
+          const r = await fetch('/api/mono?action=save', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ familyId: state.familyId, member: me, token, mapping }),
           });
@@ -1843,7 +1843,7 @@ function openMonoConnectFlow() {
           showToast('✅ Monobank підключено');
           renderSettingsPage();
           // Запускаємо backfill у фоні
-          fetch('/api/mono-backfill', {
+          fetch('/api/mono?action=backfill', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ familyId: state.familyId, member: me, days: 31 }),
           }).then(r => r.json()).then(d => {
@@ -1887,7 +1887,7 @@ async function doMonoDisconnect() {
   if (!ok) return;
   const me = state.member || 'Євген';
   try {
-    const r = await fetch('/api/mono-disconnect', {
+    const r = await fetch('/api/mono?action=disconnect', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ familyId: state.familyId, member: me }),
     });
@@ -1906,7 +1906,7 @@ async function doMonoBackfill() {
   const btn = document.getElementById('mono-backfill-btn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Тягну...'; }
   try {
-    const r = await fetch('/api/mono-backfill', {
+    const r = await fetch('/api/mono?action=backfill', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ familyId: state.familyId, member: me, days: 31 }),
     });

@@ -62,7 +62,7 @@ function collectData() {
 }
 
 async function callClaude(prompt) {
-  const res = await fetch('/api/ai-report', {
+  const res = await fetch('/api/ai?action=report', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt }),

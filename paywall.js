@@ -11,7 +11,7 @@ let _ready = null;
 
 async function getConfig() {
   if (_cfg) return _cfg;
-  const res = await fetch('/api/paddle-config');
+  const res = await fetch('/api/paddle');
   if (!res.ok) throw new Error('Оплата тимчасово недоступна');
   _cfg = await res.json();
   return _cfg;

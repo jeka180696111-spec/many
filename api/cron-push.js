@@ -2,7 +2,7 @@
 // CRON PUSH — Vercel Cron endpoint: runs every hour
 // ═══════════════════════════════════════════════════════════════
 
-import { sendScheduledPushes } from './push-send.js';
+import { sendScheduledPushes } from './_push-send.js';
 
 export default async function handler(req, res) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {

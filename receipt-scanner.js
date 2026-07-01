@@ -60,7 +60,7 @@ export function openReceiptPhoto() {
 
     try {
       const base64 = await readFileAsBase64(file);
-      const response = await fetch('/api/analyze-receipt', {
+      const response = await fetch('/api/ai?action=receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

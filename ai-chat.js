@@ -38,7 +38,7 @@ export async function askAI(userMessage, historyOverride = null) {
     { role: 'user', content: userMessage },
   ];
 
-  const res = await fetch('/api/ai-chat', {
+  const res = await fetch('/api/ai?action=chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, context }),
@@ -59,7 +59,7 @@ async function sendToClaude(userMessage) {
     { role: 'user', content: userMessage },
   ];
 
-  const res = await fetch('/api/ai-chat', {
+  const res = await fetch('/api/ai?action=chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages, context }),

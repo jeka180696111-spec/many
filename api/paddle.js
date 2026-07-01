@@ -1,4 +1,8 @@
-// Vercel serverless — Paddle Billing webhook
+// /api/paddle — Paddle Billing endpoint (об'єднаний config + webhook,
+// щоб не з'їдати два серверлес-слоти на Hobby-плані Vercel).
+//   GET  /api/paddle  → повертає public config для paywall.js
+//   POST /api/paddle  → приймальник вебхуків від Paddle
+
 import crypto from 'crypto';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -40,7 +44,25 @@ function verifySignature(rawBody, sigHeader, secret) {
 }
 
 export default async function handler(req, res) {
+  // GET → публічний конфіг для paywall.js.
+  if (req.method === 'GET') {
+    const token = process.env.PADDLE_CLIENT_TOKEN;
+    if (!token) return res.status(500).json({ error: 'PADDLE_CLIENT_TOKEN not configured' });
+    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
+    return res.json({
+      token,
+      environment: process.env.PADDLE_ENV || 'sandbox',
+      prices: {
+        week:  process.env.PADDLE_PRICE_WEEK  || null,
+        month: process.env.PADDLE_PRICE_MONTH || null,
+        year:  process.env.PADDLE_PRICE_YEAR  || null,
+      },
+    });
+  }
+
   if (req.method !== 'POST') return res.status(405).end();
+
+  // POST → webhook від Paddle.
   try {
     const raw = await readRawBody(req);
     const sig = req.headers['paddle-signature'];
@@ -62,7 +84,7 @@ export default async function handler(req, res) {
     }
     res.json({ ok: true });
   } catch (e) {
-    console.error('[paddle-webhook]', e.message);
+    console.error('[paddle]', e.message);
     res.status(500).json({ error: e.message });
   }
 }
