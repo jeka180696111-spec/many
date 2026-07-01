@@ -436,6 +436,11 @@ function renderMainMenu() {
           <div class="settings-menu-label">Гаманці та рахунки</div>
           <i class="ti ti-chevron-right settings-menu-arrow"></i>
         </button>
+        <button class="settings-menu-item" data-sub="integrations">
+          <div class="settings-menu-icon" style="background:#FEF3C7;color:#D97706"><i class="ti ti-plug"></i></div>
+          <div class="settings-menu-label">Інтеграції (Monobank)</div>
+          <i class="ti ti-chevron-right settings-menu-arrow"></i>
+        </button>
       </div>
 
       <!-- ІНФОРМАЦІЯ -->
@@ -481,6 +486,7 @@ const SUB_PAGE_TITLES = {
   'inc-cats':     'Категорії доходів',
   'wallet-types': 'Типи рахунків',
   wallets:        'Гаманці',
+  integrations:   'Інтеграції',
   subscription:   'Підписка',
   privacy:        'Політика конфіденційності',
   terms:          'Угода користувача',
@@ -823,6 +829,59 @@ function renderSubPageBody(key) {
               </label>
             </div>
           `).join('')}
+        </div>
+      `;
+    }
+
+    case 'integrations': {
+      const me = state.member || (profiles && Object.keys(profiles)[0]) || 'Євген';
+      const intKey = 'mono_' + me.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      const monoStatus = (window.__monoStatusCache && window.__monoStatusCache[intKey]) || null;
+      const connected = !!monoStatus?.connected;
+      return `
+        <div class="settings-card" style="padding:16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+            <div style="width:44px;height:44px;border-radius:12px;background:#000;display:flex;align-items:center;justify-content:center">
+              <i class="ti ti-brand-mastercard" style="color:#fff;font-size:22px"></i>
+            </div>
+            <div style="flex:1">
+              <div style="font-weight:800;font-size:16px">Monobank</div>
+              <div style="font-size:12px;color:var(--c-text-3)">Автоматичний імпорт транзакцій</div>
+            </div>
+            <span class="mono-status-pill" style="font-size:11px;padding:4px 10px;border-radius:999px;background:${connected ? 'var(--c-green-soft)' : 'var(--c-surface-2)'};color:${connected ? 'var(--c-green)' : 'var(--c-text-3)'};font-weight:700">
+              ${connected ? '● Підключено' : '○ Не підключено'}
+            </span>
+          </div>
+
+          ${connected ? `
+            <div style="font-size:13px;color:var(--c-text-2);margin-bottom:8px">
+              Підключено як <b>${esc(monoStatus.member || me)}</b>.
+              ${monoStatus.lastSeenAt ? `Остання транзакція: ${new Date(monoStatus.lastSeenAt).toLocaleString('uk-UA')}` : ''}
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-ghost" id="mono-backfill-btn" style="flex:1;min-width:140px">
+                <i class="ti ti-download"></i> Підтягнути 31 день
+              </button>
+              <button class="btn-danger" id="mono-disconnect-btn" style="flex:1;min-width:140px">
+                <i class="ti ti-plug-x"></i> Відключити
+              </button>
+            </div>
+          ` : `
+            <div style="font-size:13px;color:var(--c-text-2);margin-bottom:12px;line-height:1.5">
+              Транзакції з твого Monobank автоматично з'являтимуться в цьому додатку —
+              одразу після кожної покупки. Категорії розпізнаються по MCC-коду.
+            </div>
+            <button class="btn-primary" id="mono-connect-btn" style="width:100%">
+              <i class="ti ti-plug"></i> Підключити Monobank
+            </button>
+          `}
+        </div>
+
+        <div class="settings-card" style="padding:14px;font-size:12px;color:var(--c-text-3);line-height:1.6">
+          <div style="font-weight:700;margin-bottom:4px;color:var(--c-text-2)"><i class="ti ti-info-circle"></i> Як це працює</div>
+          Токен видає сам Monobank на <a href="https://api.monobank.ua/" target="_blank" rel="noopener" style="color:var(--c-accent)">api.monobank.ua</a>.
+          Він дає <b>тільки читання</b> — ми не можемо робити переказів чи змінювати нічого в твоєму банку.
+          Токен зберігається зашифрованим. Ти можеш відкликати його в будь-який момент на сайті Monobank.
         </div>
       `;
     }
@@ -1659,12 +1718,206 @@ function bindSettingsHandlers(el) {
     import('./wallets.js').then(m => m.openCreateWallet());
   });
 
+  // ── Monobank integration ─────────────────────────────────
+  el.querySelector('#mono-connect-btn')?.addEventListener('click', openMonoConnectFlow);
+  el.querySelector('#mono-disconnect-btn')?.addEventListener('click', doMonoDisconnect);
+  el.querySelector('#mono-backfill-btn')?.addEventListener('click', doMonoBackfill);
+  if (settingsSubPage === 'integrations') refreshMonoStatus();
+
   // Navigation
   el.querySelectorAll('[data-go]').forEach(b => {
     b.addEventListener('click', () => {
       import('./main.js').then(m => m.navigateTo(b.dataset.go));
     });
   });
+}
+
+// ── Monobank helpers ─────────────────────────────────────────
+async function refreshMonoStatus() {
+  try {
+    const me = state.member || 'Євген';
+    const intKey = 'mono_' + me.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    // Читаємо документ інтеграції з Firestore напряму через compat SDK.
+    const fb = window.firebase;
+    if (!fb || !state.familyId) return;
+    const doc = await fb.firestore().collection('families').doc(state.familyId)
+      .collection('integrations').doc(intKey).get();
+    window.__monoStatusCache = window.__monoStatusCache || {};
+    window.__monoStatusCache[intKey] = doc.exists
+      ? { connected: true, member: doc.data().member, lastSeenAt: doc.data().lastSeenAt }
+      : { connected: false };
+    // Оновлюємо тільки пілюлю статуса, без повного ререндера.
+    const pill = document.querySelector('.mono-status-pill');
+    if (pill) {
+      const connected = doc.exists;
+      pill.textContent = connected ? '● Підключено' : '○ Не підключено';
+      pill.style.background = connected ? 'var(--c-green-soft)' : 'var(--c-surface-2)';
+      pill.style.color = connected ? 'var(--c-green)' : 'var(--c-text-3)';
+    }
+    // Якщо стан не збігається з тим що ми показали — перерендерити.
+    const currentlyShown = !!document.getElementById('mono-disconnect-btn');
+    if (currentlyShown !== !!doc.exists) renderSettingsPage();
+  } catch (e) {
+    console.warn('[mono status]', e.message);
+  }
+}
+
+function openMonoConnectFlow() {
+  const me = state.member || 'Євген';
+  const modalId = openBottomSheet({
+    title: 'Підключити Monobank',
+    size: 'lg',
+    content: `
+      <div style="font-size:13px;color:var(--c-text-2);line-height:1.55;margin-bottom:14px">
+        1. Відкрий <a href="https://api.monobank.ua/" target="_blank" rel="noopener" style="color:var(--c-accent);font-weight:700">api.monobank.ua</a> у новій вкладці<br>
+        2. Увійди через QR-код (сканується додатком Моно)<br>
+        3. Скопіюй персональний токен і встав його нижче
+      </div>
+      <input type="text" id="mono-token-input" class="settings-row-input" placeholder="Токен uxxxxxxxxxxxxxxxxx" style="width:100%;font-family:monospace;font-size:12px" autocomplete="off" spellcheck="false">
+      <div id="mono-connect-err" style="color:var(--c-red);font-size:12px;margin-top:8px;display:none"></div>
+      <div id="mono-accounts-block" style="display:none;margin-top:14px"></div>
+    `,
+    footer: `
+      <button class="btn-ghost" data-modal-close>Скасувати</button>
+      <button class="btn-primary flex-1" id="mono-validate-btn">Перевірити токен</button>
+    `,
+    onOpen: (wrap) => {
+      const tokenInput = wrap.querySelector('#mono-token-input');
+      const errBox = wrap.querySelector('#mono-connect-err');
+      const accBlock = wrap.querySelector('#mono-accounts-block');
+      const validateBtn = wrap.querySelector('#mono-validate-btn');
+      let discoveredAccounts = null;
+
+      validateBtn.addEventListener('click', async () => {
+        errBox.style.display = 'none';
+        const token = tokenInput.value.trim();
+        if (!token) { errBox.textContent = 'Введи токен'; errBox.style.display = 'block'; return; }
+
+        // Крок 1: якщо токен ще не перевірений — валідація і показ рахунків.
+        if (!discoveredAccounts) {
+          validateBtn.disabled = true; validateBtn.textContent = 'Перевіряю...';
+          try {
+            const r = await fetch('/api/mono-connect', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token }),
+            });
+            const data = await r.json();
+            if (!r.ok) throw new Error(data.error || 'Помилка');
+            discoveredAccounts = data.accounts || [];
+            renderAccountsPicker(accBlock, discoveredAccounts);
+            accBlock.style.display = 'block';
+            validateBtn.textContent = 'Зберегти і підключити';
+          } catch (e) {
+            errBox.textContent = e.message;
+            errBox.style.display = 'block';
+            validateBtn.textContent = 'Перевірити токен';
+          } finally {
+            validateBtn.disabled = false;
+          }
+          return;
+        }
+
+        // Крок 2: збір мапінгу і сохранение.
+        const mapping = {};
+        accBlock.querySelectorAll('.mono-acc-row').forEach(row => {
+          const monoId = row.dataset.monoId;
+          const cardId = row.querySelector('select').value;
+          const currency = row.dataset.currency;
+          if (cardId) mapping[monoId] = { cardId, currency };
+        });
+        if (!Object.keys(mapping).length) {
+          errBox.textContent = 'Прив\'яжи хоча б один рахунок';
+          errBox.style.display = 'block';
+          return;
+        }
+
+        validateBtn.disabled = true; validateBtn.textContent = 'Зберігаю...';
+        try {
+          const r = await fetch('/api/mono-save', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ familyId: state.familyId, member: me, token, mapping }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Помилка збереження');
+          closeModal(modalId);
+          showToast('✅ Monobank підключено');
+          renderSettingsPage();
+          // Запускаємо backfill у фоні
+          fetch('/api/mono-backfill', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ familyId: state.familyId, member: me, days: 31 }),
+          }).then(r => r.json()).then(d => {
+            if (d.ok) showToast(`Додано ${d.added} операцій за 31 день`);
+          }).catch(() => {});
+        } catch (e) {
+          errBox.textContent = e.message;
+          errBox.style.display = 'block';
+          validateBtn.textContent = 'Зберегти і підключити';
+        } finally {
+          validateBtn.disabled = false;
+        }
+      });
+    },
+  });
+}
+
+function renderAccountsPicker(container, accounts) {
+  const myCards = getCards(state.member || 'Євген');
+  const cardOptions = ['<option value="">— пропустити —</option>']
+    .concat(myCards.map(c => `<option value="${esc(c.id)}">${esc(c.id)}${c.currency && c.currency !== 'UAH' ? ' · ' + c.currency : ''}</option>`))
+    .join('');
+  container.innerHTML = `
+    <div style="font-weight:700;font-size:13px;margin-bottom:8px">Прив'яжи Моно-рахунки до своїх гаманців:</div>
+    ${accounts.map(a => `
+      <div class="mono-acc-row" data-mono-id="${esc(a.id)}" data-currency="${esc(a.currency)}"
+           style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--c-border)">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:13px">${esc(a.typeLabel)} · ${esc(a.currency)}</div>
+          <div style="font-size:11px;color:var(--c-text-3)">${esc(a.maskedPan || 'без карти')} · баланс ${a.balance.toFixed(2)}${a.isCredit ? ` (ліміт ${a.creditLimit.toFixed(0)})` : ''}</div>
+        </div>
+        <select class="settings-row-input" style="max-width:150px;font-size:12px">${cardOptions}</select>
+      </div>
+    `).join('')}
+    <div style="font-size:11px;color:var(--c-text-3);margin-top:8px">Якщо потрібного гаманця немає — створи його спочатку в розділі «Гаманці».</div>
+  `;
+}
+
+async function doMonoDisconnect() {
+  const ok = await confirmModal('Відключити Monobank? Історичні операції залишаться.', { danger: true, okText: 'Відключити' });
+  if (!ok) return;
+  const me = state.member || 'Євген';
+  try {
+    const r = await fetch('/api/mono-disconnect', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, member: me }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Помилка');
+    window.__monoStatusCache = {};
+    showToast('Monobank відключено');
+    renderSettingsPage();
+  } catch (e) {
+    showToast('Помилка: ' + e.message, 'error');
+  }
+}
+
+async function doMonoBackfill() {
+  const me = state.member || 'Євген';
+  const btn = document.getElementById('mono-backfill-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Тягну...'; }
+  try {
+    const r = await fetch('/api/mono-backfill', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, member: me, days: 31 }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Помилка');
+    showToast(`Додано ${data.added} операцій (пропущено дублів: ${data.skipped})`);
+  } catch (e) {
+    showToast('Помилка: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-download"></i> Підтягнути 31 день'; }
+  }
 }
 
 // ── Image compression helper ──────────────────────────────────
