@@ -751,56 +751,35 @@ export async function createUserAndFamily(uid, { userName, userAvatar, familyNam
 
 // ── Приєднатися до родини за кодом запрошення ────────────────
 export async function joinFamilyWithCode(uid, { userName, userAvatar, code }) {
-  if (!db) throw new Error('Firestore not initialized');
-
-  const inviteRef = db.collection('invites').doc(code.toUpperCase());
-  const inviteDoc = await inviteRef.get();
-
-  if (!inviteDoc.exists) {
-    throw new Error('Невірний або застарілий код запрошення');
-  }
-
-  const invite = inviteDoc.data();
-  const now = new Date().toISOString();
-
-  if (invite.used || (invite.expiresAt && invite.expiresAt < now)) {
-    throw new Error('Невірний або застарілий код запрошення');
-  }
-
-  const { familyId } = invite;
-
-  // Читаємо родину
-  const familyDoc = await db.collection('families').doc(familyId).get();
-  if (!familyDoc.exists) throw new Error('Родину не знайдено');
-
-  const familyData = familyDoc.data();
-  const members = Array.isArray(familyData.members) ? familyData.members : [];
-  const newMember = { uid, name: userName, avatar: userAvatar, joinedAt: now };
-
-  // Оновлюємо родину — додаємо нового члена
-  await db.collection('families').doc(familyId).update({
-    members: [...members, newMember],
+  // Firestore rules не пускають нового юзера писати в чужу families/{id}
+  // (він поки не в members). Тому логіку присоединения обробляє серверний
+  // endpoint через admin SDK.
+  const res = await fetch('/api/join-family', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uid, userName, userAvatar, code: String(code).toUpperCase() }),
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-  // Документ користувача
-  await db.collection('users').doc(uid).set({
-    name: userName,
-    avatar: userAvatar,
-    familyId,
-    role: 'member',
-    createdAt: now,
-  });
-
-  // Позначаємо запрошення як використане
-  await inviteRef.update({ used: true, usedBy: uid, usedAt: now });
-
-  const memberNames = [...members.map(m => m.name), userName];
-  state.familyId = familyId;
+  // Оновлюємо локальний state щоб фронт міг продовжити далі.
+  state.familyId = data.familyId;
   state.member = userName;
-  setFamilyMembers(memberNames);
 
-  log('joined family:', familyId, 'as:', userName);
-  return { familyId, userName };
+  // Підтягуємо актуальний список членів родини.
+  try {
+    const familyDoc = await db.collection('families').doc(data.familyId).get();
+    const memberNames = Array.isArray(familyDoc.data()?.members)
+      ? familyDoc.data().members.map(m => m.name)
+      : [userName];
+    setFamilyMembers(memberNames);
+  } catch (e) {
+    // Rules ще можуть бути суворими одразу після join — fallback тільки на себе.
+    setFamilyMembers([userName]);
+  }
+
+  log('joined family:', data.familyId, 'as:', userName);
+  return { familyId: data.familyId, userName };
 }
 
 // ── Генерувати код запрошення ────────────────────────────────
