@@ -234,6 +234,8 @@ function calcBalanceSplit(viewAs) {
   let freeBalance = 0;
   let savingsBalance = 0;
 
+  const allTime = state.dashboard?.cardBalances;
+
   FAMILY_MEMBERS.forEach(m => {
     if (viewAs && m !== viewAs) return;
     getCards(m).forEach(c => {
@@ -242,20 +244,27 @@ function calcBalanceSplit(viewAs) {
       const isCredit = Number(c.creditLimit) > 0;
       if (isCredit) return; // кредитки рахуємо окремо через calcCreditAvailable
 
-      // Рахуємо баланс картки так само як renderWalletsBlock
       let bal = 0;
       const cardCur = c.currency || 'UAH';
-      (state.operations || []).forEach(o => {
-        if (o.category === 'Переказ') return;
-        if (o.who !== m || o.card !== c.id) return;
-        const opCur = o.currency || 'UAH';
-        let val = opCur === cardCur ? (o.amount || 0) : (o.amountUah || o.amount || 0);
-        if (opCur !== cardCur && cardCur !== 'UAH' && state.fx?.[cardCur]) {
-          val = val / (state.fx[cardCur].mid || 1);
-        }
-        if (o.type === 'Дохід') bal += val;
-        if (o.type === 'Витрата') bal -= val;
-      });
+      // Основний шлях — all-time дані з бекенда (у валюті операції).
+      // Синхронно з cardBal у renderWalletsBlock і сторінкою Гаманці.
+      const b = allTime?.[`${m}:${c.id}`];
+      if (b) {
+        bal = (b.income || 0) - (b.expense || 0);
+      } else {
+        // Фолбек — сумуємо state.operations (поточний місяць), краще ніж нічого.
+        (state.operations || []).forEach(o => {
+          if (o.category === 'Переказ') return;
+          if (o.who !== m || o.card !== c.id) return;
+          const opCur = o.currency || 'UAH';
+          let val = opCur === cardCur ? (o.amount || 0) : (o.amountUah || o.amount || 0);
+          if (opCur !== cardCur && cardCur !== 'UAH' && state.fx?.[cardCur]) {
+            val = val / (state.fx[cardCur].mid || 1);
+          }
+          if (o.type === 'Дохід') bal += val;
+          if (o.type === 'Витрата') bal -= val;
+        });
+      }
 
       const balUah = cardCur === 'UAH' ? bal : bal * (state.fx?.[cardCur]?.mid || 1);
       if (isSavings) savingsBalance += balUah;
