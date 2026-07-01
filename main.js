@@ -16,7 +16,7 @@ import { initTheme, toggleTheme } from './theme.js';
 import { initI18n, t, currentLang } from './i18n.js';
 import { initAuth, signInWithGoogle, signOut, whoAmI } from './auth.js';
 import { checkAndLock, startActivityTracking } from './lock-screen.js';
-import { initFirestore, apiGet, syncSettingsToSheet, loadSettingsFromFirestore, loadFamilyData } from './api.js';
+import { initFirestore, apiGet, syncSettingsToSheet, loadSettingsFromFirestore, loadFamilyData, subscribeFamilySettings } from './api.js';
 import { initFAB } from './fab.js';
 import { renderDashboard, loadDashboard } from './dashboard.js';
 import { renderWalletsPage } from './wallets.js';
@@ -540,7 +540,11 @@ async function bootApp() {
   refreshFx();
 
   // Початковий синк
-  setTimeout(() => fullSync(), 200);
+  setTimeout(() => fullSync().then(() => {
+    // Після завантаження — вмикаємо real-time слухач сімейних налаштувань.
+    // Тепер зміна лімітів/плану/аватара у Євгена миттєво прилітає Марині.
+    subscribeFamilySettings();
+  }), 200);
 
   // Авто-синк раз на 2 хвилини
   setInterval(() => {

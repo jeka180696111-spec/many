@@ -13,7 +13,7 @@ import {
 } from './storage.js';
 import { log, logError } from './utils.js';
 
-let db = null;
+export let db = null;
 
 // Дата в Київському часовому поясі
 function todayKyiv() {
@@ -664,6 +664,78 @@ export async function loadSettingsFromFirestore() {
   } catch (e) {
     logError('loadSettingsFromFirestore', e.message);
   }
+}
+
+// ── Real-time слухач документа родини ────────────────────────
+// Підписуємось на families/{familyId} — будь-які зміни налаштувань
+// (ліміти, план, порядок карт, назва, аватар, видимість віджетів)
+// прилітають миттєво до всіх залогінених членів родини.
+let _familyUnsub = null;
+export function subscribeFamilySettings() {
+  if (!db || !state.familyId) return;
+  if (_familyUnsub) { _familyUnsub(); _familyUnsub = null; }
+
+  _familyUnsub = db.collection('families').doc(state.familyId).onSnapshot(async snap => {
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+
+    const storage = await import('./storage.js');
+    let changed = false;
+
+    // Ліміти категорій.
+    if (data.categoryLimits && typeof data.categoryLimits === 'object') {
+      const cur = JSON.stringify(storage.getCategoryLimits());
+      const next = JSON.stringify(data.categoryLimits);
+      if (cur !== next) { storage.setCategoryLimits(data.categoryLimits); changed = true; }
+    }
+    // План витрат.
+    if (data.spendingPlan && typeof data.spendingPlan === 'object') {
+      const cur = JSON.stringify(storage.getSpendingPlan());
+      const next = JSON.stringify(data.spendingPlan);
+      if (cur !== next) { storage.setSpendingPlan(data.spendingPlan); changed = true; }
+    }
+    // Назва родини та аватар (fallback на createUserAndFamily поля name/avatar).
+    const famName = data.familyName || data.name;
+    if (famName && famName !== storage.getFamilyName()) {
+      storage.setFamilyName(famName); changed = true;
+    }
+    const famAvatar = data.familyAvatar || data.avatar;
+    if (famAvatar !== undefined && famAvatar !== storage.getFamilyAvatar()) {
+      storage.setFamilyAvatar(famAvatar || ''); changed = true;
+    }
+    // Порядок / згорнутість / видимість карток дашборду.
+    if (Array.isArray(data.dashCardOrder)) {
+      const cur = JSON.stringify(storage.getDashCardOrder());
+      const next = JSON.stringify(data.dashCardOrder);
+      if (cur !== next) { storage.setDashCardOrder(data.dashCardOrder); changed = true; }
+    }
+    if (Array.isArray(data.dashCollapsed)) {
+      const cur = JSON.stringify(storage.getDashCollapsed());
+      const next = JSON.stringify(data.dashCollapsed);
+      if (cur !== next) { storage.setDashCollapsed(data.dashCollapsed); changed = true; }
+    }
+    if (data.dashWidgets && typeof data.dashWidgets === 'object') {
+      const cur = JSON.stringify(storage.getDashWidgets());
+      const next = JSON.stringify(data.dashWidgets);
+      if (cur !== next) { storage.setDashWidgets(data.dashWidgets); changed = true; }
+    }
+
+    if (!changed) return;
+
+    log('family settings updated via realtime');
+    // Перерендерюємо активну сторінку щоб побачити нові значення одразу.
+    try {
+      const main = await import('./main.js');
+      if (main.renderTopbar) main.renderTopbar();
+      if (state.currentPage && main.navigateTo) main.navigateTo(state.currentPage);
+    } catch (e) { /* ignore */ }
+  }, err => {
+    console.warn('[subscribeFamilySettings]', err.message);
+  });
+}
+
+export function unsubscribeFamilySettings() {
+  if (_familyUnsub) { _familyUnsub(); _familyUnsub = null; }
 }
 
 // ═══════════════════════════════════════════════════════════════
