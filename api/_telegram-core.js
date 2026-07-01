@@ -855,19 +855,30 @@ function detectTargetMember(text, senderWho, memberNames) {
     return { who: senderWho, cleaned: text };
   }
   const others = memberNames.filter(n => n && n !== senderWho);
-  // Ловимо префікс: [для|на|від|у]? + ім'я + будь-які закінчення + роздільник.
+  // Спочатку шукаємо ім'я на початку (найпростіший і найпоширеніший
+  // варіант — "марина 300 продукти"). Потім — будь-де в реченні
+  // ("запиши що марина потратила 235", "марина купила...").
   for (const name of others) {
     // Стем = ім'я без 1-2 останніх букв, щоб зловити відмінкові закінчення.
-    // 'Марина' → 'марин', 'Євген' → 'євген', 'Ольга' → 'ольг'.
     const stemLen = Math.max(3, name.length - (name.length > 4 ? 2 : 1));
     const stem = name.toLowerCase().slice(0, stemLen);
     const stemEsc = stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`^(?:для\\s+|на\\s+|від\\s+|у\\s+)?${stemEsc}[а-яіїєґёА-ЯІЇЄҐЁ]*[\\s:,\\-]+`, 'i');
-    const m = text.match(re);
-    if (m) {
-      const cleaned = text.slice(m[0].length).trim();
-      // Якщо після імені лишається < 2 символів — це просто звернення, не витрата.
+
+    // Крок 1: явний префікс на початку.
+    const rePrefix = new RegExp(`^(?:для\\s+|на\\s+|від\\s+|у\\s+)?${stemEsc}[а-яіїєґёА-ЯІЇЄҐЁ]*[\\s:,\\-]+`, 'i');
+    const mPrefix = text.match(rePrefix);
+    if (mPrefix) {
+      const cleaned = text.slice(mPrefix[0].length).trim();
       if (cleaned.length >= 2) return { who: name, cleaned };
+    }
+
+    // Крок 2: ім'я де завгодно як окреме слово (з роздільниками навколо).
+    // Приклад: "запиши що марина потратила 235" → знаходить 'марина'.
+    const reAnywhere = new RegExp(`(?:^|[\\s(«"'-])${stemEsc}[а-яіїєґёА-ЯІЇЄҐЁ]*(?=[\\s.,;:!?)»"'-]|$)`, 'i');
+    if (reAnywhere.test(text)) {
+      // Текст не очищуємо — щоб парсер побачив дієслова 'потратила/купила/etc'
+      // і числа в контексті. Лише перекидаємо власника.
+      return { who: name, cleaned: text };
     }
   }
   return { who: senderWho, cleaned: text };
@@ -1415,10 +1426,22 @@ async function generateSarcasticComment(op, todayOps) {
   const totalToday = todayOps.reduce((s, o) => s + (o.amountUah || o.amount || 0), 0);
   const count = todayOps.length;
   const stores = todayOps.map(o => o.desc).filter(Boolean).join(', ');
-  const context = `${op.who} щойно зробив ${count}-у витрату сьогодні в категорії "${op.category}": ${op.amount} ₴${op.desc ? ` (${op.desc})` : ''}. Всього сьогодні в цій категорії: ${fmtMoney(totalToday)}${stores ? `. Місця: ${stores}` : ''}.`;
+
+  // Проста евристика статі за ім'ям (укр/рос типові жіночі закінчення).
+  const nameLower = String(op.who || '').toLowerCase();
+  const isFemale = /(а|я|ія|іна|ена)$/.test(nameLower)
+    || /(марин|катер|олен|ірин|нат|окс|тан|ксен|юл|ол|над|валер|людмил|світлан|галин|ліл|аліс|дарин|марія|софія|анастас|вікт|євген)/.test(nameLower) && nameLower.endsWith('а');
+  const genderHint = isFemale
+    ? `Стать особи: ЖІНОЧА. Використовуй жіночий рід дієслів (зробила, купила, витратила, встигла — НЕ 'зробив/купив/витратив').`
+    : `Стать особи: ЧОЛОВІЧА. Використовуй чоловічий рід дієслів (зробив, купив, витратив).`;
+
+  const gerund = isFemale ? 'зробила' : 'зробив';
+  const context = `${op.who} щойно ${gerund} ${count}-у витрату сьогодні в категорії "${op.category}": ${op.amount} ₴${op.desc ? ` (${op.desc})` : ''}. Всього сьогодні в цій категорії: ${fmtMoney(totalToday)}${stores ? `. Місця: ${stores}` : ''}.`;
 
   const systemPrompt = `Ти — саркастичний фінансовий радник на ім'я Фінн. Стиль: їдкий гумор, але з теплотою.
-Правила: УКРАЇНСЬКА, ДУЖЕ коротко (1-2 речення), один дотепний коментар про повторну витрату за день у тій самій категорії. 1-2 емодзі максимум. Не запитуй питань. Не повторюй факти дослівно.`;
+Правила: УКРАЇНСЬКА, ДУЖЕ коротко (1-2 речення), один дотепний коментар про повторну витрату за день у тій самій категорії. 1-2 емодзі максимум. Не запитуй питань. Не повторюй факти дослівно.
+${genderHint}
+Звертайся до особи (${op.who}) у другій особі ("ти вже витратила/витратив..."). Родові закінчення дієслів мають відповідати статі.`;
 
   try {
     return await callLLM(systemPrompt, [{ role: 'user', content: context }], { maxTokens: 120 });
