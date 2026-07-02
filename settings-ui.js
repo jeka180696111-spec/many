@@ -19,7 +19,7 @@ import {
   getFamilyAvatar, setFamilyAvatar,
   getDashWidgets, setDashWidgets,
 } from './storage.js';
-import { syncSettingsToSheet, pingBackend, generateInviteCode } from './api.js';
+import { syncSettingsToSheet, pingBackend, generateInviteCode, markSettingLocallyChanged } from './api.js';
 import { applyTheme, toggleTheme, applyPalette } from './theme.js';
 import { esc, showToast, uid } from './utils.js';
 import { openIconPicker } from './icon-picker.js';
@@ -217,6 +217,7 @@ function openAddBudgetItem(type) {
         const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
         d[selectedKey] = amt;
         if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+        markSettingLocallyChanged(type === 'plan' ? 'spendingPlan' : 'categoryLimits');
         syncSettingsToSheet();
         closeModal(modalId);
         renderSettingsPage();
@@ -238,6 +239,7 @@ function openEditBudgetItem(type, key, currentAmount) {
     const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
     d[key] = amt;
     if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+    markSettingLocallyChanged(type === 'plan' ? 'spendingPlan' : 'categoryLimits');
     syncSettingsToSheet();
     renderSettingsPage();
     showToast('✅ Збережено');
@@ -1686,6 +1688,7 @@ function bindSettingsHandlers(el) {
       const d = type === 'plan' ? getSpendingPlan() : getCategoryLimits();
       delete d[key];
       if (type === 'plan') setSpendingPlan(d); else setCategoryLimits(d);
+      markSettingLocallyChanged(type === 'plan' ? 'spendingPlan' : 'categoryLimits');
       syncSettingsToSheet();
       renderSettingsPage();
     });
