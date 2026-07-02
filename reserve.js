@@ -185,24 +185,12 @@ export function renderReservePage() {
     </div>
   `;
 
-  // Animate hero balance
+  // Hero-сума показується одразу без count-up — інакше на 100-300мс
+  // видно проміжне значення (наприклад 77751 замість 83652 при 90% анімації),
+  // що плутає юзерів як 'розбіжність'. Аудит підтвердив.
   requestAnimationFrame(() => {
     const balEl = el.querySelector('.reserve-hero-amount');
-    if (!balEl) return;
-    const target = grandTotal;
-    const duration = 300;
-    const start = performance.now();
-    const absT = Math.abs(target);
-    const from = absT * 0.9;
-    function tick(now) {
-      const p = Math.min((now - start) / duration, 1);
-      const ease = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-      const cur = Math.round(from + (absT - from) * ease) * (target < 0 ? -1 : 1);
-      balEl.textContent = cur.toLocaleString('uk-UA') + ' ₴';
-      if (p < 1) requestAnimationFrame(tick);
-      else balEl.textContent = fmtMoney(target, 'UAH');
-    }
-    requestAnimationFrame(tick);
+    if (balEl) balEl.textContent = fmtMoney(grandTotal, 'UAH');
   });
 
   // Клік на гаманець накопичень — перехід в Гаманці

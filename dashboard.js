@@ -124,7 +124,7 @@ export function renderDashboard() {
       </div>
 
       <!-- Spend per day -->
-      ${renderSpendPerDayCard(freeBalance, viewAs, recurringTotal)}
+      ${renderSpendPerDayCard(freeBalance, viewAs, recurringTotal, creditAvail)}
 
       <!-- Швидкі дії -->
       <div class="dash-quick-actions">
@@ -150,22 +150,7 @@ export function renderDashboard() {
     const balEl = el.querySelector('.dash-hero-balance');
     if (!balEl) return;
     const target = parseFloat(balEl.dataset.balanceTarget) || 0;
-    const duration = 350;
-    const start = performance.now();
-    const prefix = target < 0 ? '−' : '';
-    const absTarget = Math.abs(target);
-    const startFrom = absTarget * 0.9;
-    function tick(now) {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo, старт від 90% щоб не виглядало як 'помилкове значення виправляється'
-      const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      const current = Math.round(startFrom + (absTarget - startFrom) * ease);
-      balEl.textContent = prefix + current.toLocaleString('uk-UA') + ' ₴';
-      if (progress < 1) requestAnimationFrame(tick);
-      else balEl.textContent = fmtMoney(target, 'UAH');
-    }
-    requestAnimationFrame(tick);
+    balEl.textContent = fmtMoney(target, 'UAH');
   });
 
   // Алерт по кредитках (один раз при завантаженні)
@@ -177,7 +162,7 @@ export function renderDashboard() {
 }
 
 // ── Spend per day ────────────────────────────────────────────
-function calcSpendPerDay(freeBalance, viewAs) {
+function calcSpendPerDay(freeBalance, viewAs, creditAvail = 0) {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const today = now.getDate();
@@ -203,14 +188,17 @@ function calcSpendPerDay(freeBalance, viewAs) {
       return s + remaining / monthsLeft;
     }, 0);
 
-  const available = Math.max(0, freeBalance - upcoming - goalsReserve);
+  // База розрахунку 'на день' = готівка + вільний кредит − заплановані
+  // платежі − резерв на цілі. Раніше рахувалось лише від готівки, що
+  // не відповідало HERO 'Можна витратити' (готівка + кредит вільно).
+  const available = Math.max(0, freeBalance + creditAvail - upcoming - goalsReserve);
   const perDay = Math.round(available / daysLeft);
 
-  return { perDay, daysLeft, upcoming, goalsReserve: Math.round(goalsReserve) };
+  return { perDay, daysLeft, upcoming, goalsReserve: Math.round(goalsReserve), available };
 }
 
-function renderSpendPerDayCard(freeBalance, viewAs, recurringTotal) {
-  const { perDay, daysLeft, upcoming, goalsReserve } = calcSpendPerDay(freeBalance, viewAs);
+function renderSpendPerDayCard(freeBalance, viewAs, recurringTotal, creditAvail = 0) {
+  const { perDay, daysLeft, upcoming, goalsReserve, available } = calcSpendPerDay(freeBalance, viewAs, creditAvail);
   if (perDay <= 0 && freeBalance <= 0) return '';
 
   const good = perDay >= 200;
@@ -226,7 +214,7 @@ function renderSpendPerDayCard(freeBalance, viewAs, recurringTotal) {
       <div class="spd-right">
         ${upcoming > 0 ? `<div class="spd-item"><i class="ti ti-calendar-repeat"></i><span>${t('Платежі')}: −${fmtMoney(upcoming, 'UAH')}</span></div>` : ''}
         ${goalsReserve > 0 ? `<div class="spd-item"><i class="ti ti-target"></i><span>${t('Цілі')}: −${fmtMoney(goalsReserve, 'UAH')}</span></div>` : ''}
-        <div class="spd-item"><i class="ti ti-calendar-month"></i><span>${t('Баланс')}: ${fmtMoney(freeBalance, 'UAH')}</span></div>
+        <div class="spd-item"><i class="ti ti-calendar-month"></i><span>${t('Доступно')}: ${fmtMoney(available, 'UAH')}</span></div>
       </div>
     </div>
   `;
