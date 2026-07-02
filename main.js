@@ -102,6 +102,9 @@ function loadPageData(page) {
       break;
     case 'reserve':
       if (!state.reserve) loadReserve();
+      // Накопичення показує баланс з state.dashboard.cardBalances (all-time).
+      // Якщо дашборд ще не завантажений — тягнемо і перерендерюємо.
+      if (!state.dashboard) loadDashboard().then(() => import('./reserve.js').then(m => m.renderReservePage && m.renderReservePage()));
       break;
     case 'goals':
       if (!state.goals.length) loadGoals();

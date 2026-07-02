@@ -37,8 +37,16 @@ export function renderReservePage() {
   });
 
   // ── Рахуємо баланс кожного гаманця накопичень у власній валюті ──
+  // Використовуємо all-time cardBalances з дашборду (у валюті операції),
+  // симетрично з wallets.js/dashboard.js. Тому "Накопичення" тепер
+  // показує реальні залишки а не поточно-місячні (які = 0, якщо в цьому
+  // місяці не було операцій).
   const ops = state.operations || [];
+  const allTime = state.dashboard?.cardBalances;
   function cardBalance(card) {
+    const b = allTime?.[`${card.owner}:${card.id}`];
+    if (b) return (b.income || 0) - (b.expense || 0);
+    // Фолбек — сумуємо поточний місяць, якщо дашборд ще не завантажений.
     let bal = 0;
     const cardCur = card.currency || 'UAH';
     ops.forEach(o => {
@@ -179,12 +187,14 @@ export function renderReservePage() {
     const balEl = el.querySelector('.reserve-hero-amount');
     if (!balEl) return;
     const target = grandTotal;
-    const duration = 600;
+    const duration = 300;
     const start = performance.now();
+    const absT = Math.abs(target);
+    const from = absT * 0.9;
     function tick(now) {
       const p = Math.min((now - start) / duration, 1);
       const ease = p === 1 ? 1 : 1 - Math.pow(2, -10 * p);
-      const cur = Math.round(Math.abs(target) * ease) * Math.sign(target);
+      const cur = Math.round(from + (absT - from) * ease) * (target < 0 ? -1 : 1);
       balEl.textContent = cur.toLocaleString('uk-UA') + ' ₴';
       if (p < 1) requestAnimationFrame(tick);
       else balEl.textContent = fmtMoney(target, 'UAH');

@@ -114,10 +114,10 @@ export function renderDashboard() {
             </span>
             ${creditAvail > 0 ? `<span class="dash-hero-pill"><i class="ti ti-credit-card"></i> ${t('Кредит вільно')}: ${fmtMoney(creditAvail, 'UAH')}</span>` : ''}
             ${recurringTotal > 0 ? `<span class="dash-hero-pill warn" data-go="recurring"><i class="ti ti-calendar-repeat"></i> ${t('Платежі')}: ${fmtMoney(recurringTotal, 'UAH')}</span>` : ''}
-            <span class="dash-hero-pill ${savRate >= 0 ? 'pos' : 'neg'}">
+            ${totalIncome > 0 ? `<span class="dash-hero-pill ${savRate >= 0 ? 'pos' : 'neg'}">
               <i class="ti ${savRate >= 0 ? 'ti-trending-up' : 'ti-trending-down'}"></i>
               ${savRate}% ${t('накопичено')}
-            </span>
+            </span>` : ''}
             <span class="dash-hero-month">${esc(periodLabel)}</span>
           </div>
         </div>
@@ -150,16 +150,17 @@ export function renderDashboard() {
     const balEl = el.querySelector('.dash-hero-balance');
     if (!balEl) return;
     const target = parseFloat(balEl.dataset.balanceTarget) || 0;
-    const duration = 700;
+    const duration = 350;
     const start = performance.now();
     const prefix = target < 0 ? '−' : '';
     const absTarget = Math.abs(target);
+    const startFrom = absTarget * 0.9;
     function tick(now) {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
-      // easeOutExpo
+      // easeOutExpo, старт від 90% щоб не виглядало як 'помилкове значення виправляється'
       const ease = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-      const current = Math.round(absTarget * ease);
+      const current = Math.round(startFrom + (absTarget - startFrom) * ease);
       balEl.textContent = prefix + current.toLocaleString('uk-UA') + ' ₴';
       if (progress < 1) requestAnimationFrame(tick);
       else balEl.textContent = fmtMoney(target, 'UAH');
@@ -180,7 +181,9 @@ function calcSpendPerDay(freeBalance, viewAs) {
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const today = now.getDate();
-  const daysLeft = Math.max(1, daysInMonth - today + 1);
+  // Включаємо поточний день як 'залишилось', але не додаємо +1 подвійно.
+  // 02.07 з 31 днів у липні → залишилось 30 днів (сьогодні + 29 наступних).
+  const daysLeft = Math.max(1, daysInMonth - today);
 
   // Upcoming recurring payments: dayOfMonth >= today
   const upcoming = (state.recurringPayments || [])
@@ -299,6 +302,26 @@ function renderSparkline(byDay, color) {
   if (!days.length) return `<div class="sparkline-empty">${t("Немає даних")}</div>`;
   const w = 280, h = 60;
   const max = Math.max(...days.map(d => byDay[d]), 1);
+  const lineColor = color === 'green' ? 'var(--c-green)' : color === 'red' ? 'var(--c-red)' : 'var(--c-accent)';
+  const fillColor = color === 'green' ? 'var(--c-green-soft)' : color === 'red' ? 'var(--c-red-soft)' : 'var(--c-accent-soft)';
+
+  // Спец-кейс: тільки один день з даними — малюємо bar по центру,
+  // бо крива/полігон між однією точкою вироджуються в нуль-ширину.
+  if (days.length === 1) {
+    const barW = 40;
+    const cx = w / 2 - barW / 2;
+    const val = byDay[days[0]];
+    const barH = Math.max(4, (val / max) * h * 0.85);
+    const y = h - barH - 5;
+    return `
+      <div class="sparkline">
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" width="100%" height="${h}">
+          <rect x="${cx}" y="${y}" width="${barW}" height="${barH}" fill="${lineColor}" opacity="0.85" rx="4"/>
+        </svg>
+      </div>
+    `;
+  }
+
   const minDay = days[0], maxDay = days[days.length - 1];
   const range = Math.max(1, maxDay - minDay);
 
@@ -316,8 +339,6 @@ function renderSparkline(byDay, color) {
   }
 
   const areaPath = path + ` L ${points[points.length - 1][0]} ${h} L ${points[0][0]} ${h} Z`;
-  const lineColor = color === 'green' ? 'var(--c-green)' : color === 'red' ? 'var(--c-red)' : 'var(--c-accent)';
-  const fillColor = color === 'green' ? 'var(--c-green-soft)' : color === 'red' ? 'var(--c-red-soft)' : 'var(--c-accent-soft)';
 
   return `
     <div class="sparkline">
