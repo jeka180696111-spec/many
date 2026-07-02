@@ -1959,6 +1959,16 @@ async function doMonoStatus() {
         diag.push('');
         diag.push('Backfill: ' + (data.lastBackfillAt ? new Date(data.lastBackfillAt).toLocaleString('uk-UA') + ' (додано ' + data.lastBackfillAdded + ')' : '—'));
         diag.push('Остання транзакція: ' + (data.lastSeenAt ? new Date(data.lastSeenAt).toLocaleString('uk-UA') + ' (id: ' + data.lastMonoTxId + ')' : '— НЕ БУЛО ЖОДНОЇ'));
+        diag.push('');
+        diag.push('=== Debug: останній POST від Моно ===');
+        if (data.lastWebhookPostAt) {
+          diag.push('Час: ' + new Date(data.lastWebhookPostAt).toLocaleString('uk-UA'));
+          diag.push('Body preview:');
+          diag.push('  ' + (data.lastWebhookBodyPreview || '(порожньо)'));
+        } else {
+          diag.push('⚠️ Моно НЕ шле нічого на наш URL взагалі.');
+          diag.push('Причини: (1) rewrite /mh/:secret не працює, (2) Моно ще не встиг, (3) банк не тригерить webhook на такі операції.');
+        }
       }
       out.textContent = diag.join('\n');
       out.style.display = 'block';

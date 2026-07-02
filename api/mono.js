@@ -95,6 +95,8 @@ async function handleStatus(req, res) {
     connectedAt: data.connectedAt,
     lastSeenAt: data.lastSeenAt || null,
     lastMonoTxId: data.lastMonoTxId || null,
+    lastWebhookPostAt: data.lastWebhookPostAt || null,
+    lastWebhookBodyPreview: data.lastWebhookBodyPreview || null,
     lastBackfillAt: data.lastBackfillAt || null,
     lastBackfillAdded: data.lastBackfillAdded ?? null,
     mappedAccounts: Object.keys(data.mapping || {}).length,
@@ -317,17 +319,19 @@ async function handleBackfill(req, res) {
 // ── webhook: прийом push'ів від Monobank ────────────────────
 async function handleWebhook(req, res) {
   const secret = req.query?.s || '';
+  const body = req.body || {};
+
+  console.log('[mono/webhook] hit', {
+    method: req.method,
+    secret: secret ? secret.slice(0, 8) + '...' : '(empty)',
+    hasBody: !!body,
+    bodyType: body?.type,
+    bodyKeys: Object.keys(body || {}),
+  });
+
   if (!secret) return res.status(400).json({ error: 'missing secret' });
 
-  const body = req.body || {};
-  if (body.type !== 'StatementItem' || !body.data?.statementItem) {
-    return res.status(200).json({ ok: true, ignored: true });
-  }
-
   const db = getDB();
-  // Один where по унікальному webhookSecret — Firestore не потребує
-  // composite index. Раніше було ще '==' provider — потребувало ручного
-  // створення індекса, без якого webhook падав з 500 і Mono не ретраїв.
   const snap = await db.collectionGroup('integrations')
     .where('webhookSecret', '==', secret)
     .limit(1)
@@ -340,6 +344,22 @@ async function handleWebhook(req, res) {
 
   const integrationDoc = snap.docs[0];
   const integration = integrationDoc.data();
+
+  // ДІАГНОСТИКА: логуємо КОЖЕН POST що дійшов до цього хендлера,
+  // навіть якщо це не StatementItem. Щоб у користувача була видимість
+  // 'Моно взагалі шле щось чи ні'. Зберігаємо в Firestore, а не в
+  // console — щоб можна було прочитати з status endpoint'у.
+  try {
+    await integrationDoc.ref.set({
+      lastWebhookPostAt: new Date().toISOString(),
+      lastWebhookBodyPreview: JSON.stringify(body).slice(0, 800),
+    }, { merge: true });
+  } catch (e) { /* ignore logging fails */ }
+
+  if (body.type !== 'StatementItem' || !body.data?.statementItem) {
+    return res.status(200).json({ ok: true, ignored: 'not-statement-item' });
+  }
+
   if (integration.provider !== 'monobank') {
     return res.status(200).json({ ok: true, ignored: 'wrong-provider' });
   }
