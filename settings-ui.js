@@ -870,6 +870,9 @@ function renderSubPageBody(key) {
               <button class="btn-ghost" id="mono-rehook-btn" style="flex:1;min-width:140px">
                 <i class="ti ti-refresh"></i> Перереєструвати вебхук
               </button>
+              <button class="btn-ghost" id="mono-selftest-btn" style="flex:1;min-width:140px">
+                <i class="ti ti-bug"></i> Selftest webhook
+              </button>
               <button class="btn-danger" id="mono-disconnect-btn" style="flex-basis:100%;min-width:140px">
                 <i class="ti ti-plug-x"></i> Відключити
               </button>
@@ -1734,6 +1737,7 @@ function bindSettingsHandlers(el) {
   el.querySelector('#mono-backfill-btn')?.addEventListener('click', doMonoBackfill);
   el.querySelector('#mono-status-btn')?.addEventListener('click', doMonoStatus);
   el.querySelector('#mono-rehook-btn')?.addEventListener('click', doMonoRehook);
+  el.querySelector('#mono-selftest-btn')?.addEventListener('click', doMonoSelftest);
   if (settingsSubPage === 'integrations') refreshMonoStatus();
 
   // Navigation
@@ -1910,6 +1914,34 @@ async function doMonoDisconnect() {
     renderSettingsPage();
   } catch (e) {
     showToast('Помилка: ' + e.message, 'error');
+  }
+}
+
+async function doMonoSelftest() {
+  const me = state.member || 'Євген';
+  const btn = document.getElementById('mono-selftest-btn');
+  const out = document.getElementById('mono-status-out');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Тестую...'; }
+  try {
+    const r = await fetch('/api/mono?action=selftest', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, member: me }),
+    });
+    const data = await r.json();
+    if (out) {
+      out.textContent = 'Selftest webhook:\n' +
+        'URL: ' + data.url + '\n' +
+        'Status: ' + (data.responseStatus || '—') + '\n' +
+        'Body: ' + (data.responseBody || '—') + '\n' +
+        'Error: ' + (data.error || '—') + '\n' +
+        'Took: ' + data.tookMs + 'мс\n\n' +
+        '→ ' + data.hint;
+      out.style.display = 'block';
+    }
+  } catch (e) {
+    showToast('Помилка: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bug"></i> Selftest webhook'; }
   }
 }
 

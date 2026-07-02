@@ -52,6 +52,7 @@ export default async function handler(req, res) {
       case 'webhook':    return await handleWebhook(req, res);
       case 'status':     return await handleStatus(req, res);
       case 'rehook':     return await handleRehook(req, res);
+      case 'selftest':   return await handleSelfTest(req, res);
       default:
         return res.status(400).json({ error: 'Unknown action' });
     }
@@ -145,6 +146,70 @@ async function handleRehook(req, res) {
   }, { merge: true });
 
   return res.status(200).json({ ok: true, webhookUrl, monoUrl: info.webHookUrl });
+}
+
+// ── selftest: перевіряє чи наш webhook endpoint реально приймає POST
+// Робить fetch на власний збережений webhookUrl з fake payload. Якщо
+// прилетить у integration.lastWebhookPostAt — значить endpoint працює
+// і проблема на боці Моно. Якщо не прилетить — щось ламається на
+// нашій стороні (Vercel rewrite, routing тощо).
+async function handleSelfTest(req, res) {
+  const { familyId, member } = req.body || {};
+  if (!familyId || !member) return res.status(400).json({ error: 'familyId + member required' });
+
+  const db = getDB();
+  const docRef = db.collection('families').doc(familyId)
+    .collection('integrations').doc(intId(member));
+  const snap = await docRef.get();
+  if (!snap.exists) return res.status(404).json({ error: 'integration not found' });
+  const url = snap.data().webhookUrl;
+  if (!url) return res.status(400).json({ error: 'no webhookUrl in integration' });
+
+  const fakeBody = {
+    type: 'StatementItem',
+    data: {
+      account: 'selftest',
+      statementItem: {
+        id: 'selftest-' + Date.now(),
+        time: Math.floor(Date.now() / 1000),
+        description: 'Selftest fake tx',
+        mcc: 0,
+        amount: 0,
+        operationAmount: 0,
+        currencyCode: 980,
+        balance: 0,
+      },
+    },
+  };
+  const started = Date.now();
+  let status = null, resBody = null, err = null;
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'User-Agent': 'MonoSelfTest/1' },
+      body: JSON.stringify(fakeBody),
+    });
+    status = r.status;
+    resBody = (await r.text()).slice(0, 400);
+  } catch (e) {
+    err = e.message;
+  }
+  const took = Date.now() - started;
+
+  return res.status(200).json({
+    ok: !!(status >= 200 && status < 300),
+    url,
+    method: 'POST',
+    responseStatus: status,
+    responseBody: resBody,
+    error: err,
+    tookMs: took,
+    hint: err
+      ? 'POST не долетів до нашого endpoint — проблема на нашій стороні (Vercel).'
+      : status >= 200 && status < 300
+        ? 'Endpoint працює. Якщо Моно все одно не шле — проблема на боці Моно.'
+        : 'Endpoint відповів не-2xx. Моно теж отримує це і потім скидає webhook.',
+  });
 }
 
 async function handleConnect(req, res) {
