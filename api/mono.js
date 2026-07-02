@@ -50,6 +50,7 @@ export default async function handler(req, res) {
       case 'disconnect': return await handleDisconnect(req, res);
       case 'backfill':   return await handleBackfill(req, res);
       case 'webhook':    return await handleWebhook(req, res);
+      case 'status':     return await handleStatus(req, res);
       default:
         return res.status(400).json({ error: 'Unknown action' });
     }
@@ -57,6 +58,49 @@ export default async function handler(req, res) {
     console.error(`[mono/${action}]`, e.message);
     return res.status(502).json({ error: e.message });
   }
+}
+
+// ── status: діагностика підключення ─────────────────────────
+async function handleStatus(req, res) {
+  const { familyId, member } = req.body || {};
+  if (!familyId || !member) return res.status(400).json({ error: 'familyId + member required' });
+
+  const db = getDB();
+  const snap = await db.collection('families').doc(familyId)
+    .collection('integrations').doc(intId(member)).get();
+  if (!snap.exists) return res.status(200).json({ connected: false });
+
+  const data = snap.data();
+  // Опційно — перевіряємо на боці Моно, що зберігся правильний вебхук.
+  let monoWebhook = null;
+  let monoOk = null;
+  try {
+    const token = decryptSecret(data.encToken);
+    const info = await getClientInfo(token);
+    monoWebhook = info.webHookUrl || '';
+    monoOk = true;
+  } catch (e) {
+    monoOk = false;
+  }
+
+  return res.status(200).json({
+    connected: true,
+    member: data.member,
+    provider: data.provider,
+    ourWebhookUrl: data.webhookUrl,
+    monoWebhookUrl: monoWebhook,
+    urlsMatch: monoWebhook && monoWebhook === data.webhookUrl,
+    monoTokenOk: monoOk,
+    connectedAt: data.connectedAt,
+    lastSeenAt: data.lastSeenAt || null,
+    lastMonoTxId: data.lastMonoTxId || null,
+    lastBackfillAt: data.lastBackfillAt || null,
+    lastBackfillAdded: data.lastBackfillAdded ?? null,
+    mappedAccounts: Object.keys(data.mapping || {}).length,
+    mapping: Object.fromEntries(
+      Object.entries(data.mapping || {}).map(([k, v]) => [k, v?.cardId + ' · ' + v?.currency])
+    ),
+  });
 }
 
 // ── connect: валідація токена + список рахунків ─────────────
@@ -225,9 +269,11 @@ async function handleWebhook(req, res) {
   }
 
   const db = getDB();
+  // Один where по унікальному webhookSecret — Firestore не потребує
+  // composite index. Раніше було ще '==' provider — потребувало ручного
+  // створення індекса, без якого webhook падав з 500 і Mono не ретраїв.
   const snap = await db.collectionGroup('integrations')
     .where('webhookSecret', '==', secret)
-    .where('provider', '==', 'monobank')
     .limit(1)
     .get();
 
@@ -238,6 +284,9 @@ async function handleWebhook(req, res) {
 
   const integrationDoc = snap.docs[0];
   const integration = integrationDoc.data();
+  if (integration.provider !== 'monobank') {
+    return res.status(200).json({ ok: true, ignored: 'wrong-provider' });
+  }
   const familyRef = integrationDoc.ref.parent.parent;
 
   const monoAccountId = body.data.account;

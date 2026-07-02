@@ -864,10 +864,14 @@ function renderSubPageBody(key) {
               <button class="btn-ghost" id="mono-backfill-btn" style="flex:1;min-width:140px">
                 <i class="ti ti-download"></i> Підтягнути 31 день
               </button>
-              <button class="btn-danger" id="mono-disconnect-btn" style="flex:1;min-width:140px">
+              <button class="btn-ghost" id="mono-status-btn" style="flex:1;min-width:140px">
+                <i class="ti ti-stethoscope"></i> Діагностика
+              </button>
+              <button class="btn-danger" id="mono-disconnect-btn" style="flex-basis:100%;min-width:140px">
                 <i class="ti ti-plug-x"></i> Відключити
               </button>
             </div>
+            <div id="mono-status-out" style="display:none;margin-top:12px;padding:12px;background:var(--c-surface-2);border-radius:8px;font-size:12px;font-family:monospace;white-space:pre-wrap;color:var(--c-text-2);max-height:300px;overflow:auto"></div>
           ` : `
             <div style="font-size:13px;color:var(--c-text-2);margin-bottom:12px;line-height:1.5">
               Транзакції з твого Monobank автоматично з'являтимуться в цьому додатку —
@@ -1725,6 +1729,7 @@ function bindSettingsHandlers(el) {
   el.querySelector('#mono-connect-btn')?.addEventListener('click', openMonoConnectFlow);
   el.querySelector('#mono-disconnect-btn')?.addEventListener('click', doMonoDisconnect);
   el.querySelector('#mono-backfill-btn')?.addEventListener('click', doMonoBackfill);
+  el.querySelector('#mono-status-btn')?.addEventListener('click', doMonoStatus);
   if (settingsSubPage === 'integrations') refreshMonoStatus();
 
   // Navigation
@@ -1901,6 +1906,44 @@ async function doMonoDisconnect() {
     renderSettingsPage();
   } catch (e) {
     showToast('Помилка: ' + e.message, 'error');
+  }
+}
+
+async function doMonoStatus() {
+  const me = state.member || 'Євген';
+  const btn = document.getElementById('mono-status-btn');
+  const out = document.getElementById('mono-status-out');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Перевіряю...'; }
+  try {
+    const r = await fetch('/api/mono?action=status', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, member: me }),
+    });
+    const data = await r.json();
+    if (out) {
+      const diag = [];
+      diag.push('Підключено: ' + (data.connected ? '✓' : '✗'));
+      if (data.connected) {
+        diag.push('Токен валідний: ' + (data.monoTokenOk ? '✓' : '✗ (відкликаний або протух)'));
+        diag.push('Наш вебхук URL:\n  ' + (data.ourWebhookUrl || '—'));
+        diag.push('Що зберіг Моно:\n  ' + (data.monoWebhookUrl || '(порожньо!)'));
+        diag.push('URL співпадають: ' + (data.urlsMatch ? '✓' : '✗ ← ЦЕ ПРИЧИНА якщо покупки не приходять'));
+        diag.push('');
+        diag.push('Мапінг: ' + data.mappedAccounts + ' рахунк(ів)');
+        Object.entries(data.mapping || {}).forEach(([id, val]) => {
+          diag.push('  ' + id.slice(0, 12) + '… → ' + val);
+        });
+        diag.push('');
+        diag.push('Backfill: ' + (data.lastBackfillAt ? new Date(data.lastBackfillAt).toLocaleString('uk-UA') + ' (додано ' + data.lastBackfillAdded + ')' : '—'));
+        diag.push('Остання транзакція: ' + (data.lastSeenAt ? new Date(data.lastSeenAt).toLocaleString('uk-UA') + ' (id: ' + data.lastMonoTxId + ')' : '— НЕ БУЛО ЖОДНОЇ'));
+      }
+      out.textContent = diag.join('\n');
+      out.style.display = 'block';
+    }
+  } catch (e) {
+    showToast('Помилка: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-stethoscope"></i> Діагностика'; }
   }
 }
 
