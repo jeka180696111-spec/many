@@ -738,6 +738,63 @@ export function unsubscribeFamilySettings() {
   if (_familyUnsub) { _familyUnsub(); _familyUnsub = null; }
 }
 
+// ── Real-time слухач колекції операцій ───────────────────────
+// Стежимо за families/{familyId}/operations — коли з'являється або
+// змінюється операція (додав з телефона, прилетів webhook від Моно,
+// чи Марина щось записала) — оновлюємо дашборд і список операцій.
+//
+// Використовуємо debounce 800мс, щоб серія швидких змін (наприклад
+// backfill 31 дня) не тригерила N reload'ів. Також ігноруємо локальні
+// незапушені зміни (hasPendingWrites) — інакше кожен свій же addOp
+// одразу тригерив би повний reload двічі.
+let _opsUnsub = null;
+let _opsReloadTimer = null;
+
+function scheduleOpsReload() {
+  if (_opsReloadTimer) return;
+  _opsReloadTimer = setTimeout(async () => {
+    _opsReloadTimer = null;
+    try {
+      const [dash, ops] = await Promise.all([
+        import('./dashboard.js'),
+        import('./operations-list.js'),
+      ]);
+      dash.loadDashboard && dash.loadDashboard();
+      ops.loadOperations && ops.loadOperations();
+    } catch (e) { /* ignore */ }
+  }, 800);
+}
+
+export function subscribeFamilyOperations() {
+  if (!db || !state.familyId) return;
+  if (_opsUnsub) { _opsUnsub(); _opsUnsub = null; }
+
+  // Ловимо тільки нові документи, створені після підписки. `where` по
+  // createdAt від 'зараз' відсікає початковий snapshot з усіма
+  // існуючими операціями, і слухач не тригериться на них.
+  const startAt = new Date().toISOString();
+
+  _opsUnsub = db.collection('families').doc(state.familyId)
+    .collection('operations')
+    .where('createdAt', '>=', startAt)
+    .onSnapshot(snap => {
+      if (snap.empty) return;
+      // Локальні незапушені зміни ігноруємо — це наш власний addOp,
+      // після якого ми і так робимо loadDashboard/loadOperations.
+      if (snap.metadata && snap.metadata.hasPendingWrites) return;
+      // Змінилось щось на бекенді (інший пристрій / член родини / webhook).
+      log('operations changed on backend — refreshing');
+      scheduleOpsReload();
+    }, err => {
+      console.warn('[subscribeFamilyOperations]', err.message);
+    });
+}
+
+export function unsubscribeFamilyOperations() {
+  if (_opsUnsub) { _opsUnsub(); _opsUnsub = null; }
+  if (_opsReloadTimer) { clearTimeout(_opsReloadTimer); _opsReloadTimer = null; }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // КОРИСТУВАЧ І РОДИНА
 // ═══════════════════════════════════════════════════════════════

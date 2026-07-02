@@ -16,7 +16,7 @@ import { initTheme, toggleTheme } from './theme.js';
 import { initI18n, t, currentLang } from './i18n.js';
 import { initAuth, signInWithGoogle, signOut, whoAmI } from './auth.js';
 import { checkAndLock, startActivityTracking } from './lock-screen.js';
-import { initFirestore, apiGet, syncSettingsToSheet, loadSettingsFromFirestore, loadFamilyData, subscribeFamilySettings } from './api.js';
+import { initFirestore, apiGet, syncSettingsToSheet, loadSettingsFromFirestore, loadFamilyData, subscribeFamilySettings, subscribeFamilyOperations } from './api.js';
 import { initFAB } from './fab.js';
 import { renderDashboard, loadDashboard } from './dashboard.js';
 import { renderWalletsPage } from './wallets.js';
@@ -541,9 +541,11 @@ async function bootApp() {
 
   // Початковий синк
   setTimeout(() => fullSync().then(() => {
-    // Після завантаження — вмикаємо real-time слухач сімейних налаштувань.
-    // Тепер зміна лімітів/плану/аватара у Євгена миттєво прилітає Марині.
+    // Real-time слухачі: одна підписка на документ родини (ліміти, план,
+    // аватар, порядок карт) і одна на колекцію operations (нові витрати
+    // з телефона, від іншого члена родини або webhook від Моно).
     subscribeFamilySettings();
+    subscribeFamilyOperations();
   }), 200);
 
   // Авто-синк раз на 2 хвилини
