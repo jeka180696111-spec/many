@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/mh/:secret", "destination": "/api/mono?action=webhook&s=:secret" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "crons": [

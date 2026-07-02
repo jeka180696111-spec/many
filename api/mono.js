@@ -51,6 +51,7 @@ export default async function handler(req, res) {
       case 'backfill':   return await handleBackfill(req, res);
       case 'webhook':    return await handleWebhook(req, res);
       case 'status':     return await handleStatus(req, res);
+      case 'rehook':     return await handleRehook(req, res);
       default:
         return res.status(400).json({ error: 'Unknown action' });
     }
@@ -104,6 +105,46 @@ async function handleStatus(req, res) {
 }
 
 // ── connect: валідація токена + список рахунків ─────────────
+// ── rehook: перереєструвати вебхук з існуючого запису ──────
+// Використовується коли інтеграція вже підключена, але URL у Моно
+// втрачений (порожній) — не треба питати юзера токен знову.
+// Оновлює також webhookUrl у Firestore до нового чистого формату.
+async function handleRehook(req, res) {
+  const { familyId, member } = req.body || {};
+  if (!familyId || !member) return res.status(400).json({ error: 'familyId + member required' });
+
+  const db = getDB();
+  const docRef = db.collection('families').doc(familyId)
+    .collection('integrations').doc(intId(member));
+  const snap = await docRef.get();
+  if (!snap.exists) return res.status(404).json({ error: 'integration not found' });
+
+  const data = snap.data();
+  const token = decryptSecret(data.encToken);
+  const secret = data.webhookSecret || randomSecret();
+  const webhookUrl = `${baseUrl(req)}/mh/${secret}`;
+
+  await setWebhook(token, webhookUrl);
+  // Verify
+  const info = await getClientInfo(token);
+  const ok = info.webHookUrl === webhookUrl;
+  if (!ok) {
+    return res.status(502).json({
+      error: `Моно не зберіг URL (у нього: '${info.webHookUrl || 'порожньо'}')`,
+      ourUrl: webhookUrl,
+      monoUrl: info.webHookUrl || null,
+    });
+  }
+
+  await docRef.set({
+    webhookSecret: secret,
+    webhookUrl,
+    updatedAt: new Date().toISOString(),
+  }, { merge: true });
+
+  return res.status(200).json({ ok: true, webhookUrl, monoUrl: info.webHookUrl });
+}
+
 async function handleConnect(req, res) {
   const { token } = req.body || {};
   if (!token || typeof token !== 'string') {
@@ -152,9 +193,24 @@ async function handleSave(req, res) {
   }
   const db = getDB();
   const secret = randomSecret();
-  const webhookUrl = `${baseUrl(req)}/api/mono?action=webhook&s=${secret}`;
+  // Чистий шлях без query string. Vercel rewrite '/mh/:secret' → '/api/mono?action=webhook&s=:secret'.
+  // Моно категорично не приймає URL з '?' та '&' у деяких перевірках і мовчки скидає webhook.
+  const webhookUrl = `${baseUrl(req)}/mh/${secret}`;
 
-  await setWebhook(token.trim(), webhookUrl);
+  const cleanToken = token.trim();
+  await setWebhook(cleanToken, webhookUrl);
+
+  // Верифікуємо: перечитуємо client-info і перевіряємо чи URL справді зберігся.
+  // Якщо Моно повернув success але URL не зберіг (буває на rate limit / валідації) —
+  // одразу повідомляємо клієнта замість того щоб мовчки залишити зламаний webhook.
+  try {
+    const info = await getClientInfo(cleanToken);
+    if (!info.webHookUrl || info.webHookUrl !== webhookUrl) {
+      throw new Error(`Monobank не зберіг вебхук (у нього: '${info.webHookUrl || 'порожньо'}'). Спробуй ще раз через хвилину — можливо rate limit.`);
+    }
+  } catch (e) {
+    return res.status(502).json({ error: e.message });
+  }
 
   const encToken = encryptSecret(token.trim());
   const doc = {

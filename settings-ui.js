@@ -867,6 +867,9 @@ function renderSubPageBody(key) {
               <button class="btn-ghost" id="mono-status-btn" style="flex:1;min-width:140px">
                 <i class="ti ti-stethoscope"></i> Діагностика
               </button>
+              <button class="btn-ghost" id="mono-rehook-btn" style="flex:1;min-width:140px">
+                <i class="ti ti-refresh"></i> Перереєструвати вебхук
+              </button>
               <button class="btn-danger" id="mono-disconnect-btn" style="flex-basis:100%;min-width:140px">
                 <i class="ti ti-plug-x"></i> Відключити
               </button>
@@ -1730,6 +1733,7 @@ function bindSettingsHandlers(el) {
   el.querySelector('#mono-disconnect-btn')?.addEventListener('click', doMonoDisconnect);
   el.querySelector('#mono-backfill-btn')?.addEventListener('click', doMonoBackfill);
   el.querySelector('#mono-status-btn')?.addEventListener('click', doMonoStatus);
+  el.querySelector('#mono-rehook-btn')?.addEventListener('click', doMonoRehook);
   if (settingsSubPage === 'integrations') refreshMonoStatus();
 
   // Navigation
@@ -1906,6 +1910,25 @@ async function doMonoDisconnect() {
     renderSettingsPage();
   } catch (e) {
     showToast('Помилка: ' + e.message, 'error');
+  }
+}
+
+async function doMonoRehook() {
+  const me = state.member || 'Євген';
+  const btn = document.getElementById('mono-rehook-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2"></i> Реєструю...'; }
+  try {
+    const r = await fetch('/api/mono?action=rehook', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ familyId: state.familyId, member: me }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Помилка');
+    showToast('✅ Вебхук перереєстровано у Моно');
+  } catch (e) {
+    showToast('Помилка: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Перереєструвати вебхук'; }
   }
 }
 
