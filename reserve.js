@@ -77,11 +77,14 @@ export function renderReservePage() {
   const avgMonthlyExpense = calcAvgMonthlyExpense(ops);
   const survivalMonths = avgMonthlyExpense > 0 ? totalSavings / avgMonthlyExpense : 0;
 
-  // ── Старий резерв (з листа Резерв у таблиці) ──
+  // ── Старий резерв (legacy, з листа Резерв у таблиці) ──
   const r = state.reserve || {};
   const oldReserveTotal = r.totalUah || 0;
   const txs = r.transactions || [];
-  const grandTotal = totalSavings + oldReserveTotal;
+  // grandTotal лишаємо для анімації, але HERO тепер показує тільки
+  // сумму гаманців-накопичень — це і є 'скільки в мене відкладено'.
+  // Старий резерв (якщо є) — окремим блоком нижче.
+  const grandTotal = totalSavings;
 
   el.innerHTML = `
     <div class="page-inner">
@@ -89,12 +92,12 @@ export function renderReservePage() {
         <h1 class="page-title">Накопичення</h1>
       </div>
 
-      <!-- HERO: загальний резерв -->
+      <!-- HERO: сумма гаманців з типом 'Накопичення' -->
       <div class="reserve-hero">
-        <div class="reserve-hero-label">Загальний резерв</div>
-        <div class="reserve-hero-amount">${fmtMoney(grandTotal, 'UAH')}</div>
+        <div class="reserve-hero-label">На гаманцях накопичень</div>
+        <div class="reserve-hero-amount">${fmtMoney(totalSavings, 'UAH')}</div>
         <div class="reserve-hero-meta">
-          ${cardsWithBal.length > 0 ? `<span class="chip">🏦 ${cardsWithBal.length} кошел.</span>` : ''}
+          ${cardsWithBal.length > 0 ? `<span class="chip">🏦 ${cardsWithBal.length} ${cardsWithBal.length === 1 ? 'гаманець' : cardsWithBal.length < 5 ? 'гаманця' : 'гаманців'}</span>` : ''}
           ${r.monthsCoverage > 0 ? `<span class="chip">🛡 На ${r.monthsCoverage} міс.</span>` : ''}
         </div>
       </div>
