@@ -584,30 +584,55 @@ export function syncSettingsToSheet() {
   });
 }
 
+// Тільки ті поля що юзер справді щойно змінив локально йдуть у sync.
+// Список береться з storage.getPendingSyncFields() — автоматично
+// заповнюється сеттерами (setCategoryLimits, setFamilyName тощо).
+// Раніше слався весь блок налаштувань — і чужі sync'и (наприклад Марина
+// щось міняла у себе) перезаписували твої свіжі зміни якщо у неї
+// в кеші ще був старий стан твого поля.
 async function _doSyncSettings() {
   if (syncInFlight) return syncInFlight;
 
   syncInFlight = (async () => {
     try {
-      const { getCategoryLimits, getSpendingPlan, getDashCardOrder, getDashCollapsed, getDashWidgets, getFamilyAvatar } = await import('./storage.js');
-      await updateSettings({
-        action: 'updateSettings',
-        familyName: getFamilyName(),
-        familyAvatar: getFamilyAvatar(),
-        expCats: getExpCats(),
-        incCats: getIncCats(),
-        cardsEvgen: getCards('Євген'),
-        cardsMarina: getCards('Марина'),
-        walletTypes: getWalletTypes(),
-        profiles: getProfiles(),
-        categoryLimits: getCategoryLimits(),
-        spendingPlan: getSpendingPlan(),
-        dashCardOrder: getDashCardOrder(),
-        dashCollapsed: getDashCollapsed(),
-        dashWidgets: getDashWidgets(),
-      });
+      const storage = await import('./storage.js');
+      const pending = storage.getPendingSyncFields();
+      if (pending.size === 0) return; // немає локальних змін — не слемо
+
+      const fieldGetters = {
+        familyName:     () => getFamilyName(),
+        familyAvatar:   () => storage.getFamilyAvatar(),
+        expCats:        () => getExpCats(),
+        incCats:        () => getIncCats(),
+        cardsEvgen:     () => getCards('Євген'),
+        cardsMarina:    () => getCards('Марина'),
+        walletTypes:    () => getWalletTypes(),
+        profiles:       () => getProfiles(),
+        categoryLimits: () => storage.getCategoryLimits(),
+        spendingPlan:   () => storage.getSpendingPlan(),
+        dashCardOrder:  () => storage.getDashCardOrder(),
+        dashCollapsed:  () => storage.getDashCollapsed(),
+        dashWidgets:    () => storage.getDashWidgets(),
+      };
+
+      const payload = { action: 'updateSettings' };
+      const included = [];
+      for (const field of pending) {
+        const getter = fieldGetters[field];
+        if (getter) {
+          payload[field] = getter();
+          included.push(field);
+          // Також mute-нути на 3с щоб listener не перекинув чуже старе
+          markSettingLocallyChanged(field);
+        }
+      }
+
+      if (included.length === 0) return;
+
+      await updateSettings(payload);
+      storage.clearPendingSyncFields(included);
       syncState.pendingSettings = false;
-      log('settings synced to Firestore');
+      log('settings synced to Firestore:', included.join(','));
     } catch (e) {
       syncState.pendingSettings = true;
       logError('syncSettings', e.message);
@@ -638,10 +663,11 @@ export async function loadSettingsFromFirestore() {
     const data = await getSettings();
     if (!data) return;
 
+    const storage = await import('./storage.js');
     const { setExpCats, setIncCats, setCards, setWalletTypes,
             setProfiles, setFamilyName, setFamilyAvatar,
             setCategoryLimits, setSpendingPlan,
-            setDashCardOrder, setDashCollapsed, setDashWidgets } = await import('./storage.js');
+            setDashCardOrder, setDashCollapsed, setDashWidgets } = storage;
 
     if (data.expCats && Array.isArray(data.expCats)) setExpCats(data.expCats);
     if (data.incCats && Array.isArray(data.incCats)) setIncCats(data.incCats);
@@ -659,6 +685,11 @@ export async function loadSettingsFromFirestore() {
     if (Array.isArray(data.dashCardOrder)) setDashCardOrder(data.dashCardOrder);
     if (Array.isArray(data.dashCollapsed)) setDashCollapsed(data.dashCollapsed);
     if (data.dashWidgets && typeof data.dashWidgets === 'object') setDashWidgets(data.dashWidgets);
+
+    // Ми щойно завантажили дані З Firestore — це НЕ наші локальні зміни.
+    // Прибираємо всі позначки, які setters додали, щоб не спробувати
+    // одразу sync-нути назад те що щойно завантажили.
+    storage.clearPendingSyncFields();
 
     log('settings loaded from Firestore');
   } catch (e) {
@@ -748,6 +779,11 @@ export function subscribeFamilySettings() {
     }
 
     if (!changed) return;
+
+    // Ми застосували чужі зміни — це НЕ наші локальні. Прибираємо
+    // позначки, які додались через setters, щоб наступний sync не
+    // відправив чужі значення назад як 'наші зміни'.
+    storage.clearPendingSyncFields();
 
     log('family settings updated via realtime');
     // Перерендерюємо активну сторінку щоб побачити нові значення одразу.

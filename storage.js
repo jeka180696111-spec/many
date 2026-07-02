@@ -5,6 +5,18 @@
 import { APP_CONFIG, DEFAULT_EXP_CATS, DEFAULT_INC_CATS, DEFAULT_CARDS, DEFAULT_WALLET_TYPES, FAMILY_MEMBERS } from './config.js';
 import { logError } from './utils.js';
 
+// ── Локально-змінені поля для sync ──────────────────────────
+// Кожен setter, що впливає на сімейний Firestore, додає ім'я поля сюди.
+// syncSettingsToSheet зчитує цю мапу і слить ТІЛЬКИ реально змінені
+// поля — не перезаписуючи чужі свіжі зміни іншого юзера з їх кешу.
+const _pendingSyncFields = new Set();
+export function markFieldChanged(field) { _pendingSyncFields.add(field); }
+export function getPendingSyncFields() { return new Set(_pendingSyncFields); }
+export function clearPendingSyncFields(fields) {
+  if (!fields) { _pendingSyncFields.clear(); return; }
+  for (const f of fields) _pendingSyncFields.delete(f);
+}
+
 // ── Базові обгортки ─────────────────────────────────────────
 function readJson(key, fallback) {
   try {
@@ -69,6 +81,7 @@ export function getExpCats() {
   return v === null ? DEFAULT_EXP_CATS : (Array.isArray(v) ? v : DEFAULT_EXP_CATS);
 }
 export function setExpCats(cats) {
+  _pendingSyncFields.add('expCats');
   writeJson(APP_CONFIG.EXP_CATS_KEY, cats);
 }
 
@@ -78,6 +91,7 @@ export function getIncCats() {
   return v === null ? DEFAULT_INC_CATS : (Array.isArray(v) ? v : DEFAULT_INC_CATS);
 }
 export function setIncCats(cats) {
+  _pendingSyncFields.add('incCats');
   writeJson(APP_CONFIG.INC_CATS_KEY, cats);
 }
 
@@ -115,6 +129,8 @@ export function setCards(cards, member) {
     logError('setCards', 'member required');
     return;
   }
+  if (member === 'Євген') _pendingSyncFields.add('cardsEvgen');
+  else if (member === 'Марина') _pendingSyncFields.add('cardsMarina');
   const key = APP_CONFIG.CARDS_KEY + '_' + member;
   writeJson(key, cards);
 }
@@ -131,6 +147,7 @@ export function getProfiles() {
 }
 
 export function setProfiles(profiles) {
+  _pendingSyncFields.add('profiles');
   writeJson(APP_CONFIG.PROFILES_KEY, profiles);
 }
 
@@ -141,6 +158,7 @@ export function getWalletTypes() {
 }
 
 export function setWalletTypes(types) {
+  _pendingSyncFields.add('walletTypes');
   writeJson(APP_CONFIG.WALLET_TYPES_KEY, types);
 }
 
@@ -154,6 +172,7 @@ export function getFamilyName() {
   return localStorage.getItem(APP_CONFIG.FAMILY_KEY) || '';
 }
 export function setFamilyName(name) {
+  _pendingSyncFields.add('familyName');
   localStorage.setItem(APP_CONFIG.FAMILY_KEY, name);
   markDirty(APP_CONFIG.FAMILY_KEY);
 }
@@ -191,6 +210,7 @@ export function getDashWidgets() {
   } catch { return { ...DEFAULT_WIDGETS }; }
 }
 export function setDashWidgets(w) {
+  _pendingSyncFields.add('dashWidgets');
   localStorage.setItem('budget_dash_widgets', JSON.stringify(w));
 }
 
@@ -202,6 +222,7 @@ export function getDashCardOrder() {
   } catch { return [...DEFAULT_CARD_ORDER]; }
 }
 export function setDashCardOrder(order) {
+  _pendingSyncFields.add('dashCardOrder');
   localStorage.setItem('budget_dash_card_order', JSON.stringify(order));
   markDirty('budget_dash_card_order');
 }
@@ -214,6 +235,7 @@ export function getDashCollapsed() {
   } catch { return []; }
 }
 export function setDashCollapsed(arr) {
+  _pendingSyncFields.add('dashCollapsed');
   const uniq = Array.from(new Set(arr || []));
   localStorage.setItem('budget_dash_collapsed', JSON.stringify(uniq));
   markDirty('budget_dash_collapsed');
@@ -239,6 +261,7 @@ export function getFamilyAvatar() {
   return localStorage.getItem('budget_family_avatar') || '';
 }
 export function setFamilyAvatar(val) {
+  _pendingSyncFields.add('familyAvatar');
   localStorage.setItem('budget_family_avatar', val);
   markDirty('budget_family_avatar');
 }
@@ -318,6 +341,7 @@ export function getCategoryLimits() {
   return readJson('budget_cat_limits', {});
 }
 export function setCategoryLimits(limits) {
+  _pendingSyncFields.add('categoryLimits');
   writeJson('budget_cat_limits', limits);
 }
 
@@ -325,6 +349,7 @@ export function getSpendingPlan() {
   return readJson('budget_spending_plan', {});
 }
 export function setSpendingPlan(plan) {
+  _pendingSyncFields.add('spendingPlan');
   writeJson('budget_spending_plan', plan);
 }
 
